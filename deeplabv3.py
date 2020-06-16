@@ -72,3 +72,13 @@ class Model2(nn.Module):
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
         return center, regressions
+    def create_model_dirs(self):
+        self.logs_dir = self.project_dir + "/training_logs"
+        self.model_dir = self.logs_dir + "/model_%s" % self.model_id
+        self.checkpoints_dir = self.model_dir + "/checkpoints"
+        if not os.path.exists(self.logs_dir):
+            os.makedirs(self.logs_dir)
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
+            os.makedirs(self.checkpoints_dir)
+
