@@ -22,8 +22,8 @@ def get_cityscapes_dataset(root='./CityscapesData/', train=True, download=True):
 class TrainDataset(Dataset):
     def __init__(self, Dataset):
         self.data = []  # this should hold a list of all samples
-        for i in range(len(Dataset)//200):
-            self.data.append(Dataset[i])
+        for i in Dataset:
+            self.data.append(i)
     def __len__(self):
         return len(self.data)
 
