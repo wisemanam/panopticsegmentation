@@ -66,7 +66,7 @@ class Model2(nn.Module):
         feature_map = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNet18_OS8 or ResNet34_OS8, it will be (batch_size, 512, h/8, w/8). If self.resnet is ResNet50-152, it will be (batch_size, 4*512, h/16, w/16))
 
         # Decoder for instance segmentation:
-        center, regressions = self.assp_2(feature_map)
+        center, regressions = self.aspp_2(feature_map)
         center = F.upsample(center, size=(h, w), mode="bilinear")
         regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
         # Should output center with shape (B, 1, H/16, W/16)
