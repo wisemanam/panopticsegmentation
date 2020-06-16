@@ -17,11 +17,13 @@ def get_accuracy(y_pred, y):
 
 
 def train(model, data_loader, criterion, optimizer):
-    model.train()
-
+    model1.train()
+    model2.train()
+    
     if config.use_cuda:
-        model.cuda()
-
+        model1.cuda()
+        model2.cuda()
+        
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
         (x, y), name = sample
@@ -32,12 +34,19 @@ def train(model, data_loader, criterion, optimizer):
 
         optimizer.zero_grad()
         y = y*255.0
-        y_pred = model(x)
-
+        y_pred_seg = model1(x)
+        y_pred_center, y_pred_regression = model2(x)
+        
+        y_gt_seg = y
+        image_name, (segmentation_map, y_gt_center, y_gt_regression) = data_loader.dataset.__getitem__(i)
+        
         loss = criterion(y_pred, (y.long()).squeeze())
+        loss += criterion2(y_pred_center, y_gt_center)
+        loss += criterion2(y_pred_regression, y_gt_regression)
 
         acc = get_accuracy(y_pred, y)
-
+        # Do we need to get the accuracy for instance segmentation?
+        
         loss.backward()
         optimizer.step()
         losses.append(loss.item())
@@ -52,9 +61,12 @@ def train(model, data_loader, criterion, optimizer):
 
 
 def validation(model, data_loader, criterion):
-    model.eval()
+    model1.eval()
+    model2.eval()
+    
     if config.use_cuda:
-        model.cuda()
+        model1.cuda()
+        model2.cuda()
 
         losses, accs = [], []
         for i, sample in enumerate(data_loader):
@@ -65,11 +77,17 @@ def validation(model, data_loader, criterion):
                 y = y.cuda()
 
             y=y*255.0
-            y_pred = model(x)
+            y_pred_seg = model1(x)
+            y_pred_center, y_pred_regression = model2(x)
 
-            loss = criterion(y_pred, (y.long()).squeeze())
-
-            acc = get_accuracy(y_pred, y)
+            y_gt_seg = y
+            image_name, (segmentation_map, y_gt_center, y_gt_regression) = data_loader.dataset.__getitem__(i)
+            
+            loss = criterion1(y_pred_seg, (y_gt_seg.long()).squeeze())
+            loss += criterion2(y_pred_center, y_gt_center)
+            loss += criterion2(y_pred_regression, y_gt_regression)
+            
+            acc = get_accuracy(y_pred_seg, y_gt_seg)
 
             losses.append(loss.item())
             accs.append(acc.item())
