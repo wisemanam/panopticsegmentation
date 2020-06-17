@@ -27,24 +27,28 @@ def train(model, data_loader, criterion, optimizer):
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
         (x, y), name = sample
+        
+        y_gt_seg = y
+        (y_gt_center_and _regression, segmentation_map), image_name = data_loader.dataset.__getitem__(i)
+        y_gt_center = y_gt_center_and_regression[0].unsqueeze(0)
+        y_gt_regression = y_gt_center_and_regression[1:]
 
         if config.use_cuda:
             x = x.cuda()
-            y = y.cuda()
+            y_gt_seg = y_gt_seg.cuda()
+            y_gt_center = y_gt_center.cuda()
+            y_gt_regression = y_gt_regression.cuda()
 
         optimizer.zero_grad()
-        y = y*255.0
+        y_gt_seg = y_gt_seg*255.0
         y_pred_seg = model1(x)
         y_pred_center, y_pred_regression = model2(x)
-        
-        y_gt_seg = y
-        image_name, (segmentation_map, y_gt_center, y_gt_regression) = data_loader.dataset.__getitem__(i)
         
         loss = criterion(y_pred, (y.long()).squeeze())
         loss += criterion2(y_pred_center, y_gt_center)
         loss += criterion2(y_pred_regression, y_gt_regression)
 
-        acc = get_accuracy(y_pred, y)
+        acc = get_accuracy(y_pred_seg, y_gt_seg)
         # Do we need to get the accuracy for instance segmentation?
         
         loss.backward()
@@ -72,17 +76,21 @@ def validation(model, data_loader, criterion):
         for i, sample in enumerate(data_loader):
             (x, y), name = sample
 
+            y_gt_seg = y
+            (y_gt_center_and_regression, segmentation_map), image_name = data_loader.dataset.__getitem__(i)
+            y_gt_center = y_gt_center_and_regression[0].unsqueeze(0)
+            y_gt_regression = y_gt_center_and_regression[1:]
+            
             if config.use_cuda:
                 x = x.cuda()
-                y = y.cuda()
+                y_gt_seg = y_gt_seg.cuda()
+                y_gt_center = y_gt_center.cuda()
+                y_gt_regression = y_gt_regression.cuda()
 
-            y=y*255.0
+            y_gt_seg=y_gt_seg*255.0
             y_pred_seg = model1(x)
             y_pred_center, y_pred_regression = model2(x)
 
-            y_gt_seg = y
-            image_name, (segmentation_map, y_gt_center, y_gt_regression) = data_loader.dataset.__getitem__(i)
-            
             loss = criterion1(y_pred_seg, (y_gt_seg.long()).squeeze())
             loss += criterion2(y_pred_center, y_gt_center)
             loss += criterion2(y_pred_regression, y_gt_regression)
