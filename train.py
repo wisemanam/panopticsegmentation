@@ -29,7 +29,7 @@ def train(model, data_loader, criterion, optimizer):
         (x, y), name = sample
         
         y_gt_seg = y
-        (y_gt_center_and _regression, segmentation_map), image_name = data_loader.dataset.__getitem__(i)
+        image_name, (y_gt_center_and _regression, segmentation_map) = data_loader.dataset.__getitem__(i)
         y_gt_center = y_gt_center_and_regression[0].unsqueeze(0)
         y_gt_regression = y_gt_center_and_regression[1:]
 
@@ -77,7 +77,7 @@ def validation(model, data_loader, criterion):
             (x, y), name = sample
 
             y_gt_seg = y
-            (y_gt_center_and_regression, segmentation_map), image_name = data_loader.dataset.__getitem__(i)
+            image_name, (y_gt_center_and_regression, segmentation_map) = data_loader.dataset.__getitem__(i)
             y_gt_center = y_gt_center_and_regression[0].unsqueeze(0)
             y_gt_regression = y_gt_center_and_regression[1:]
             
