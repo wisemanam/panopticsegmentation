@@ -47,7 +47,7 @@ class ValidationDataset(Cityscapes):
 
 class CustomCityscapes(Cityscapes):
     def __init__(self, root, split, mode, transform, target_transform, target_type):
-        super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_transform=target_transform, target_type='semantic')
+        super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_transform=target_transform, target_type=['semantic', 'instance'])
 
     def __getitem__(self, index):
         img_name = self.images[index]
