@@ -33,7 +33,7 @@ class TrainDataset(Cityscapes):
     def __getitem__(self, index):
         h = 1024
         w = 2048
-        (x, y), image_name = self.data[index]
+        image_name = self.images[index]
         (segmentation_maps, instance_maps), image = super().__getitem__(index)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         center = (0, 0)
