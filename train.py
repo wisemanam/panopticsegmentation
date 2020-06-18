@@ -26,10 +26,10 @@ def train(model, data_loader, criterion, optimizer):
         
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression) = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression), image_name = sample
 
         if config.use_cuda:
-            # x = x.cuda()
+            image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
@@ -69,10 +69,10 @@ def validation(model, data_loader, criterion):
 
         losses, accs = [], []
         for i, sample in enumerate(data_loader):
-            image, (y_gt_seg, y_gt_center, y_gt_regression) = sample
+            image, (y_gt_seg, y_gt_center, y_gt_regression), image_name = sample
             
             if config.use_cuda:
-                # x = x.cuda()
+                image = image.cuda()
                 y_gt_seg = y_gt_seg.cuda()
                 y_gt_center = y_gt_center.cuda()
                 y_gt_regression = y_gt_regression.cuda()
