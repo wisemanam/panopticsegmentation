@@ -30,7 +30,7 @@ class TrainDataset(Dataset):
     def __getitem__(self, index):
         h = 1024
         w = 2048
-        (segmentation_maps, instance_maps), image = self.data[index] # super().__getitem__(index)
+        (segmentation_maps, instance_maps), image = super().__getitem__(index)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         center = (0, 0)
         for instance in np.unique(instance_maps):
@@ -73,7 +73,7 @@ class ValidationDataset(Dataset):
     def __getitem__(self, index):
         h = 1024
         w = 2048
-        (segmentation_maps, instance_maps), image = self.data[index] # super().__getitem__(index)
+        (segmentation_maps, instance_maps), image = super().__getitem__(index)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         center = (0, 0)
         for instance in np.unique(instance_maps):
