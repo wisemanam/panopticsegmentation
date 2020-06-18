@@ -19,7 +19,7 @@ def get_cityscapes_dataset(root='./CityscapesData/', train=True, download=True):
     else:
         return CustomCityscapes(root, split='val', mode='fine', transform=transform, target_transform=target_transform, target_type='semantic')
 
-class TrainDataset(Dataset):
+class TrainDataset(Cityscapes):
     def __init__(self, Dataset):
         self.data = []  # this should hold a list of all samples
         for i in Dataset:
@@ -30,6 +30,7 @@ class TrainDataset(Dataset):
     def __getitem__(self, index):
         h = 1024
         w = 2048
+        (x, y), image_name = self.data[index]
         (segmentation_maps, instance_maps), image = super().__getitem__(index)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         center = (0, 0)
@@ -59,9 +60,9 @@ class TrainDataset(Dataset):
                 else:
                     x_dist, y_dist = column - center[1], row - center[0]
                     instance_regressions[0][row][column], instance_regressions[1][row][column] = x_dist, y_dist
-        return image, (segmentation_maps, instance_centers, instance_regressions)
+        return image, (segmentation_maps, instance_centers, instance_regressions), image_name
 
-class ValidationDataset(Dataset):
+class ValidationDataset(Cityscapes):
     def __init__(self, Dataset):
         self.data = []  # this should hold a list of all samples
         for i in Dataset:
@@ -73,6 +74,7 @@ class ValidationDataset(Dataset):
     def __getitem__(self, index):
         h = 1024
         w = 2048
+        (x, y), image_name = self.data[index]
         (segmentation_maps, instance_maps), image = super().__getitem__(index)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         center = (0, 0)
@@ -102,7 +104,7 @@ class ValidationDataset(Dataset):
                 else:
                     x_dist, y_dist = column - center[1], row - center[0]
                     instance_regressions[0][row][column], instance_regressions[1][row][column] = x_dist, y_dist
-        return image, (segmentation_maps, instance_centers, instance_regressions)
+        return image, (segmentation_maps, instance_centers, instance_regressions), image_name
 
 class CustomCityscapes(Cityscapes):
     def __init__(self, root, split, mode, transform, target_transform, target_type):
