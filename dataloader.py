@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
-from torchvision import transforms
+from torchvision import transforms, torch
 from PIL import Image
 from math import pi, exp
 
@@ -47,6 +47,8 @@ class ValidationDataset(Cityscapes):
 
 class CustomCityscapes(Cityscapes):
     def __init__(self, root, split, mode, transform, target_transform, target_type):
+        target_transform = transforms.Compose(
+                    [transforms.Resize(size=(512, 1024), interpolation=Image.NEAREST), transforms.Lambda(lambda x: x.numpy())])
         super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_transform=target_transform, target_type=['semantic', 'instance'])
 
     def __getitem__(self, index):
@@ -82,5 +84,8 @@ class CustomCityscapes(Cityscapes):
                 else:
                     x_dist, y_dist = column - center[1], row - center[0]
                     instance_regressions[0][row][column], instance_regressions[1][row][column] = x_dist, y_dist
+        segmentation_maps = torch.from_numpy(segmentation_maps)
+        instance_centers = torch.from_numpy(instance_centers)
+        instance_regressions = torch.from_numpy(instance_regressions)
         return image, (segmentation_maps, instance_centers, instance_regressions), img_name
         
