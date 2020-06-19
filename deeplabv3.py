@@ -67,8 +67,8 @@ class Model2(nn.Module):
 
         # Decoder for instance segmentation:
         center, regressions = self.aspp_2(feature_map)
-        center = F.upsample(center, size=(h, w), mode="bilinear")
-        regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
+        center = F.upsample(center, size=(h/16, w/16), mode="bilinear")
+        regressions = F.upsample(regressions, size=(h/16, w/16), mode="bilinear")
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
         return center, regressions
