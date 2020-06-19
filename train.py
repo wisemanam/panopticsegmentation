@@ -39,9 +39,9 @@ def train(model, data_loader, criterion, optimizer):
         y_pred_seg = model1(image)
         y_pred_center, y_pred_regression = model2(image)
         
-        loss = criterion(y_pred, (y.long()).squeeze())
-        loss += criterion2(y_pred_center, y_gt_center)
-        loss += criterion2(y_pred_regression, y_gt_regression)
+        loss = criterion(y_pred, y.long())
+        loss += criterion2(y_pred_center, y_gt_center.float())
+        loss += criterion2(y_pred_regression, y_gt_regression.float())
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
         # Do we need to get the accuracy for instance segmentation?
@@ -81,9 +81,9 @@ def validation(model, data_loader, criterion):
             y_pred_seg = model1(image)
             y_pred_center, y_pred_regression = model2(image)
 
-            loss = criterion1(y_pred_seg, (y_gt_seg.long()).squeeze())
-            loss += criterion2(y_pred_center, y_gt_center)
-            loss += criterion2(y_pred_regression, y_gt_regression)
+            loss = criterion1(y_pred_seg, y_gt_seg.long())
+            loss += criterion2(y_pred_center, y_gt_center.float())
+            loss += criterion2(y_pred_regression, y_gt_regression.float())
             
             acc = get_accuracy(y_pred_seg, y_gt_seg)
 
@@ -98,7 +98,8 @@ def validation(model, data_loader, criterion):
 
 def run_experiment():
     model = DeepLabV3('Model1', 'SimpleSegmentation/')
-    criterion = nn.CrossEntropyLoss(reduction='mean')
+    criterion1 = nn.CrossEntropyLoss(reduction='mean')
+    criterion2 = nn.MSELoss(reduction='mean')
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-7)
     tr_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', True, download=True)  # TrainDataset()  # A custom dataloader may be needed, in which case use TrainDataset()
     val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)  # ValidationDataset() # A custom dataloader may be needed, in which case use ValidationDataset()
