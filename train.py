@@ -11,10 +11,7 @@ import inference
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.argmax(y_pred, 1)
-
     return torch.mean((y_argmax.long()==y.long()).type(torch.float))
-
-
 
 def train(model, data_loader, criterion1, criterion2, optimizer):
     model.train()
@@ -24,6 +21,7 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
 
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
+        # loads image, segmentation maps, instannce centers, instance regressions, intances present, and image name from dataloader
         image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         image = Variable(image.type(torch.FloatTensor))
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
@@ -41,6 +39,7 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
+        # calculates the loss
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
         loss += criterion2(y_pred_center, y_gt_center).mean()
         loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
@@ -68,6 +67,7 @@ def validation(model, data_loader, criterion1, criterion2):
 
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
+        # loads image, segmentation maps, instannce centers, instance regressions, intances present, and image name from dataloader
         image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
@@ -82,7 +82,7 @@ def validation(model, data_loader, criterion1, criterion2):
             y_gt_reg_pres = y_gt_reg_pres.cuda()
         
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
- 
+        #calculates the loss
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
         loss += criterion2(y_pred_center, y_gt_center).mean()
         loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
