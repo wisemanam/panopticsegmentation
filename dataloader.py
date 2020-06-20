@@ -26,6 +26,7 @@ class CustomCityscapes(Cityscapes):
         for i in range(33):
             for j in range(33):
                 self.gaussian[i, j] = 1/(2*np.pi*8*8)* np.exp( 0-((i-17)**2 +(j-17)**2) / (2*8*8) )
+    
     def __getitem__(self, index):
         img_name = self.images[index]
         h = 512
@@ -33,15 +34,17 @@ class CustomCityscapes(Cityscapes):
         image, (segmentation_maps, instance_maps) = super().__getitem__(index)
         segmentation_maps = segmentation_maps.resize(size=(w, h), resample=Image.NEAREST)
         instance_maps = instance_maps.resize(size=(w, h), resample=Image.NEAREST)
+        
         instance_maps = np.array(instance_maps)
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
+        
         center = (0, 0)
         centers = {}
         b_box = {}
         for row in range(len(instance_maps)):
             for column in range(len(instance_maps[row])):
                 instance = instance_maps[row][column]
-                if instance == 0:
+                if instance < 1000:
                     continue
                 if instance not in b_box:
                     b_box[instance] = [h, 0, w, 0]
@@ -56,6 +59,8 @@ class CustomCityscapes(Cityscapes):
                     right = column
                 b_box[instance] = [top, bottom, left, right]
         for instance in b_box:
+            if instance not in b_box:
+                continue
             top, bottom, left, right = b_box[instance]
             instance_height = abs(bottom - top)
             instance_width = abs(right - left)
@@ -63,11 +68,12 @@ class CustomCityscapes(Cityscapes):
             center = (min(w - 17, max(17, center[0])), min(h-17, max(17, center[1])))
             centers[instance] = center
             instance_centers[0, center[1] - 16: center[1] + 17, center[0] - 16: center[0] + 17] += self.gaussian
-        instance_centers = instance_centers/max(instance_centers.max(), 0.000001)
+       
+        instance_centers = np.clip(instance_centers, 0, 1)
 
         for row in range(len(instance_maps)):
             for column in range(len(instance_maps[row])):
-                if instance_maps[row][column] == 0:  # if pixel is not part of an instance
+                if instance_maps[row][column] < 1000:  # if pixel is not part of an instance
                     continue
                 else:
                     center = centers[instance_maps[row][column]]
@@ -75,7 +81,7 @@ class CustomCityscapes(Cityscapes):
                     instance_regressions[0][row][column], instance_regressions[1][row][column] =  x_dist, y_dist
        
         segmentation_maps = self.seg_transform(segmentation_maps)*255  #torch.from_numpy(segmentation_maps)
-        instance_maps = torch.from_numpy(instance_maps)
+        
         return image, (segmentation_maps, instance_centers, instance_regressions), img_name
 
         
