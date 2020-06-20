@@ -24,23 +24,26 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
 
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression), img_name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         image = Variable(image.type(torch.FloatTensor))
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
-        y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))  
+        y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
+        y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
+        
         if config.use_cuda:
             image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
+            y_gt_reg_pres = y_gt_reg_pres.cuda()
 
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
-        loss += criterion2(y_pred_center, y_gt_center)
-        loss += criterion2(y_pred_regression, y_gt_regression)
+        loss += criterion2(y_pred_center, y_gt_center).mean()
+        loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
 
@@ -65,21 +68,24 @@ def validation(model, data_loader, criterion1, criterion2):
 
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression), img_name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
         y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
+        y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
+        
         if config.use_cuda:
             image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
+            y_gt_reg_pres = y_gt_reg_pres.cuda()
         
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
  
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
-        loss += criterion2(y_pred_center, y_gt_center)
-        loss += criterion2(y_pred_regression, y_gt_regression)
+        loss += criterion2(y_pred_center, y_gt_center).mean()
+        loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
 
