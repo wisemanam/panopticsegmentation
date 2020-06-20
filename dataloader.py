@@ -21,8 +21,8 @@ def get_cityscapes_dataset(root='./CityscapesData/', train=True, download=True):
 class CustomCityscapes(Cityscapes):
     def __init__(self, root, split, mode, transform, target_type):
         super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_type=['semantic', 'instance'])
-        self.seg_transform = transforms.ToTensor()
-        self.gaussian = np.zeros((33,33))
+        self.seg_transform = transforms.ToTensor() # used to transform segmentation map back to tensor
+        self.gaussian = np.zeros((33,33)) # applied to instance centers
         for i in range(33):
             for j in range(33):
                 self.gaussian[i, j] = 1/(2*np.pi*8*8)* np.exp( 0-((i-17)**2 +(j-17)**2) / (2*8*8) )
@@ -39,9 +39,10 @@ class CustomCityscapes(Cityscapes):
         instance_centers, instance_regressions = np.zeros((1, h, w)), np.zeros((2, h, w))
         instance_present = np.zeros((1, h, w))
         
-        center = (0, 0)
-        centers = {}
-        b_box = {}
+        centers = {} # holds the centers for each instance: centers[instance] = (x, y)
+        b_box = {} # holds the bounds of each instance: b_box[instance] = [top, bottom, left, right]
+        
+        # identifies the bounding box for each instance
         for row in range(len(instance_maps)):
             for column in range(len(instance_maps[row])):
                 instance = instance_maps[row][column]
@@ -59,6 +60,8 @@ class CustomCityscapes(Cityscapes):
                 if column > right:
                     right = column
                 b_box[instance] = [top, bottom, left, right]
+                
+        # identifies the center of each bounding box/instance
         for instance in b_box:
             if instance not in b_box:
                 continue
@@ -69,9 +72,9 @@ class CustomCityscapes(Cityscapes):
             center = (min(w - 17, max(17, center[0])), min(h-17, max(17, center[1])))
             centers[instance] = center
             instance_centers[0, center[1] - 16: center[1] + 17, center[0] - 16: center[0] + 17] += self.gaussian
-       
         instance_centers = np.clip(instance_centers, 0, 1)
-
+        
+        # finds the distance bewteen each pixel and its instance's center
         for row in range(len(instance_maps)):
             for column in range(len(instance_maps[row])):
                 if instance_maps[row][column] < 1000:  # if pixel is not part of an instance
@@ -118,15 +121,3 @@ class ValidationDataset(Cityscapes):
         x, y = 0, 0  # placeholder for the sample input(s) and output(s)
 
         return {'x': x, 'y': y}
-
-def get_cityscapes_dataset2(root='./CityscapesData/', train=True, download=True):
-    transform = transforms.Compose(
-         [transforms.Resize(size=(512,1024), interpolation=Image.BILINEAR), transforms.ToTensor()])
-        # used to transform PIL image to pytorch tensor
-    target_transform = transforms.Compose(
-         [transforms.Resize(size=(512,1024), interpolation=Image.NEAREST), transforms.ToTensor()])
-
-    if train:
-        return TrainDataset(CustomCityscapes(root, split='train', mode='fine', transform=transform, target_transform=target_transform, target_type='semantic'))
-    else:
-        return TrainDataset(CustomCityscapes(root, split='val', mode='fine', transform=transform, target_transform=target_transform, target_type='semantic'))
