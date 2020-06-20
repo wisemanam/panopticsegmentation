@@ -84,7 +84,7 @@ class CustomCityscapes(Cityscapes):
                     x_dist, y_dist = column - center[0], row - center[1]
                     instance_regressions[0][row][column], instance_regressions[1][row][column] =  x_dist, y_dist
                     instance_present[0, row, column] = 1
-        segmentation_maps = self.seg_transform(segmentation_maps)*255  #torch.from_numpy(segmentation_maps)
+        segmentation_maps = self.seg_transform(segmentation_maps)*255
         
         return image, (segmentation_maps, instance_centers, instance_regressions, instance_present), img_name
 
