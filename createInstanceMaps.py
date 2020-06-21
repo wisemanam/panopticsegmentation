@@ -36,7 +36,7 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
             
             closest_dist, closest_id = 10000000, -1
             for i, (center_y, center_x) in enumerate(centers):
-                dist = (center_y-center_pred_y)**2 + (center_xcenter_pred_x)**2
+                dist = (center_y-center_pred_y)**2 + (center_x-center_pred_x)**2
                 if dist < closest_dist:
                     closest_dist = dist
                     closest_id = i+1
