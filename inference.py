@@ -33,7 +33,7 @@ def inference(model, data_loader):
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
        
-        y_pred_seg, y_pred_center, y_pred_regressions = model(image)
+        y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
         y_list.append(name)
 
@@ -76,7 +76,7 @@ def main():
             min_loss = float(loss)
         if int(epoch) > max_epoch:
             max_epoch = int(epoch)
-    model = DeepLabV3('Model1', 'SimpleSegmentation/')
+    model = Model2('Model2', 'SimpleSegmentation/')
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_loss)))['state_dict'])
     val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
