@@ -5,6 +5,7 @@ from train import get_accuracy
 from torchvision.utils import save_image
 import os
 from dataloader import DataLoader, ValidationDataset, get_cityscapes_dataset
+from torch.autograd.variable import Variable
 from cityscapesscripts.evaluation.evalPixelLevelSemanticLabeling import main as eval_main
 from deeplabv3 import DeepLabV3
 from PIL import Image
