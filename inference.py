@@ -18,8 +18,6 @@ def inference(model, data_loader):
 
     y_list = []
     y_pred_seg_list = []
-    y_pred_center_list = []
-    y_pred_regression_list = []
     img_ind = 0
 
     for i, sample in enumerate(data_loader):
@@ -38,9 +36,7 @@ def inference(model, data_loader):
 
         y_list.append(name)
 
-        y_pred_seg_softmax = torch.softmax(y_pred_seg, 1)  # should give shape (B, H, W)
-        y_pred_center_softmax = torch.softmax(y_pred_center, 1)  # should give shape (B, H, W)
-        y_pred_regression_softmax = torch.softmax(y_pred_regression, 1)  # should give shape (B, H, W)
+        y_pred_seg_softmax = torch.argmax(y_pred_seg, 1)  # should give shape (B, H, W)
 
         for img in y_pred_seg_softmax:
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
@@ -48,21 +44,9 @@ def inference(model, data_loader):
             img_ind += 1
             y_pred_seg_list.append(img_name)
             
-        for img in y_pred_center_softmax:
-            img_name = './SavedImages/output_center_%d.png' % img_ind
-            save_image(img, img_name)
-            img_ind += 1
-            y_pred_center_list.append(img_name)
-            
-        for img in y_pred_regression_softmax:
-            img_name = './SavedImages/output_regression_%d.png' % img_ind
-            save_image(img, img_name)
-            img_ind += 1
-            y_pred_regression_list.append(img_name)
-
+        
     eval_main(y_pred_seg_list, y_list)
-    eval_main(y_pred_center, y_list)
-    eval_main(y_pred_regression, y_list)
+    
 
     print('Finished inference.')
 
