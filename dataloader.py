@@ -14,13 +14,13 @@ def get_cityscapes_dataset(root='./CityscapesData/', train=True, download=True):
         # used to transform PIL Image to tensor
 
     if train:
-	return CustomCityscapes(root, split='train', mode='fine', transform=transform, target_type=['semantic', '$
+	return CustomCityscapes(root, split='train', mode='fine', transform=transform, target_type=['semantic', 'instance'])
     else:
 	return CustomCityscapes(root, split='val', mode='fine', transform=transform, target_type='semantic')
 
 class CustomCityscapes(Cityscapes):
     def __init__(self, root, split, mode, transform, target_type):
-        super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_type$
+        super(CustomCityscapes, self).__init__(root, split='train', mode='fine', transform=transform, target_type=['semantic', 'instance'])
 
         # used to transform segmentation map back to tensor
         self.seg_transform = transforms.ToTensor()
