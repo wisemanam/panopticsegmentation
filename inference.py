@@ -35,37 +35,42 @@ def inference(model, data_loader):
 
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-        y_list.append(name)
+        # y_list.append(name)
 
         y_pred_seg_argmax = torch.argmax(y_pred_seg, 1)  # should give shape (B, H, W)
-
-        for i in range(len(y_pred_seg_argmax)):
+        y_pred_center = y_pred_center.data.cpu().numpy()
+        y_pred_regression = y_pred_regression.data.cpu().numpy()
+        for j in range(len(y_pred_seg_argmax)):
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
-            save_image(y_pred_seg_argmax[i], img_name)
+            save_image(y_pred_seg_argmax[j], img_name)
             y_pred_seg_list.append(img_name)
-            pred_instance_map = create_instance_maps(y_pred_seg_argmax[i], y_pred_center[i].cpu().detach().numpy(), y_pred_regression[i].cpu().detach().numpy()) # should give shape (H, W)
+            pred_instance_map = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j]$
             img_name = './SavedImages/output_instances_%d.png' % img_ind
             save_image(torch.from_numpy(pred_instance_map), img_name)
             img_ind += 1
             y_pred_instance_list.append(img_name)
-
+            y_list.append(name[j])
+        if i == 5:
+            break
     eval_main(y_pred_seg_list, y_list)
     eval_main2(y_pred_instance_list, y_list)
 
-if __name__ == '__main__':
-    max_epoch = 1000000
-    min_loss = 0
-    for i in './SavedModels':
-        model_info = i.split('_')
+def main():
+    max_epoch = 0
+    min_loss = 1000000.0000
+    for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
+        model_info = filename.split('_')
         epoch = model_info[1]
-        loss = model_info[2].split('.')
+        loss = model_info[2].split('.p')[0]
         if float(loss) < min_loss:
-            min_loss = loss
-        if epoch > max_epoch:
-            max_epoch = epoch
-    model = Model2('Model2', 'SimpleSegmentation/')
-    model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_loss)))['state_dict'])
-    val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
-    print('Finished inference.')
+            min_loss = float(loss)
+        if int(epoch) > max_epoch:
+            max_epoch = int(epoch)
+        model = Model2('Model2', 'SimpleSegmentation/')
+        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_lo$
+        val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)
+        val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
+
+        inference(model, val_dataloader)
+
 
