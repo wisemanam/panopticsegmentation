@@ -44,7 +44,7 @@ def inference(model, data_loader):
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
             save_image(y_pred_seg_argmax[j], img_name)
             y_pred_seg_list.append(img_name)
-            pred_instance_map = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j]$
+            pred_instance_map = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j])
             img_name = './SavedImages/output_instances_%d.png' % img_ind
             save_image(torch.from_numpy(pred_instance_map), img_name)
             img_ind += 1
@@ -67,7 +67,7 @@ def main():
         if int(epoch) > max_epoch:
             max_epoch = int(epoch)
         model = Model2('Model2', 'SimpleSegmentation/')
-        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_lo$
+        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_loss)))['state_dict'])
         val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)
         val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False)
 
