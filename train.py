@@ -2,7 +2,7 @@ import config
 import torch
 from torch.autograd.variable import Variable
 import numpy as np
-from dataloader import TrainDataset, ValidationDataset, DataLoader, get_cityscapes_dataset, get_cityscapes_dataset2
+from dataloader import TrainDataset, ValidationDataset, DataLoader, get_cityscapes_dataset
 import torch.nn as nn
 import torch.optim as optim
 from deeplabv3 import DeepLabV3, Model2
@@ -11,7 +11,10 @@ import inference
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.argmax(y_pred, 1)
+
     return torch.mean((y_argmax.long()==y.long()).type(torch.float))
+
+
 
 def train(model, data_loader, criterion1, criterion2, optimizer):
     model.train()
@@ -20,15 +23,15 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         model.cuda()
 
     losses, accs = [], []
+
     for i, sample in enumerate(data_loader):
-        # loads image, segmentation maps, instannce centers, instance regressions, intances present, and image name from dataloader
         image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         image = Variable(image.type(torch.FloatTensor))
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
         y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
         y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
-        
+
         if config.use_cuda:
             image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
@@ -39,7 +42,6 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-        # calculates the loss
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
         loss += criterion2(y_pred_center, y_gt_center).mean()
         loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
@@ -51,8 +53,8 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         losses.append(loss.item())
         accs.append(acc.item())
 
-        if (i + 1) % 10 == 0:
-            print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i+1, float(np.mean(losses)), float(np.mean(accs))), flush = True)
+        if (i + 1) % 100 == 0:
+            print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i+1, float(np.mean(losses)), flo$
 
     print('Finished training. Loss: %.4f. Accuracy: %.4f.' % (float(np.mean(losses)), float(np.mean(accs))))
 
@@ -67,22 +69,20 @@ def validation(model, data_loader, criterion1, criterion2):
 
     losses, accs = [], []
     for i, sample in enumerate(data_loader):
-        # loads image, segmentation maps, instannce centers, instance regressions, intances present, and image name from dataloader
         image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
         y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
         y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
-        
+
         if config.use_cuda:
             image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
-        
+
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        #calculates the loss
         loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
         loss += criterion2(y_pred_center, y_gt_center).mean()
         loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
@@ -94,7 +94,6 @@ def validation(model, data_loader, criterion1, criterion2):
 
         if (i + 1) % 100 == 0:
             print('Finished validating %d batches. Loss: %.4f. Accuracy: %.4f.' % (i+1, float(np.mean(losses)), float(np.mean(accs))))
-
     print('Finished validation. Loss: %.4f. Accuracy: %.4f.' % (float(np.mean(losses)), float(np.mean(accs))))
 
     return float(np.mean(losses)), float(np.mean(accs))
@@ -105,29 +104,28 @@ def run_experiment():
     model = Model2('Model2', 'SimpleSegmentation/')
     criterion1 = nn.CrossEntropyLoss(reduction='mean')
     criterion2 = nn.MSELoss(reduction='mean')
-    optimizer = optim.Adam(model2.parameters(), lr=config.learning_rate, weight_decay=1e-7)
-    tr_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', True, download=True)  # TrainDataset()  # A custom dataloader may be needed, in which case use TrainDataset()
-    val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True)  # ValidationDataset() # A custom dataloader may be needed, in which case use ValidationDataset()
+    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-7)
+    tr_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', True, download=True) 
+    val_dataset = get_cityscapes_dataset('~/SimpleSegmentation/CityscapesData', False, download=True) 
 
     best_loss = 1000000
-    
+
     for epoch in range(1, config.n_epochs + 1):
         print('Epoch', epoch)
 
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
         val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-
         losses, _  = train(model, tr_dataloader, criterion1, criterion2, optimizer)
 
         losses, _  = validation(model, val_dataloader, criterion1, criterion2)
-        
+
         if losses < best_loss:
             print('Model Improved -- Saving.')
             best_loss = losses
 
             save_file_path = os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(epoch, losses))
             states = {
-                      'epoch': epoch + 1,
+                        'epoch': epoch + 1,
                       'state_dict': model.state_dict(),
                       'optimizer': optimizer.state_dict()
                      }
@@ -140,5 +138,6 @@ def run_experiment():
     print('Training Finished')
 
 if __name__ == '__main__':
-    run_experiment()
+    # run_experiment()
     inference.main()
+                                                                                   
