@@ -38,15 +38,20 @@ def inference(model, data_loader):
         # y_list.append(name)
 
         y_pred_seg_argmax = torch.argmax(y_pred_seg, 1)  # should give shape (B, H, W)
-        y_pred_center = y_pred_center.data.cpu().numpy()
-        y_pred_regression = y_pred_regression.data.cpu().numpy()
+        y_pred_center = y_pred_center.data.cpu().numpy() # converts tensor to numpy
+        y_pred_regression = y_pred_regression.data.cpu().numpy() #converts tensor to numpy
         for j in range(len(y_pred_seg_argmax)):
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
-            save_image(y_pred_seg_argmax[j], img_name)
+            img = y_pred_seg_argmax[j].cpu().data.numpy()  # Converts the tensor to numpy
+            img  = Image.fromarray(img) # Converts numpy array to PIL Image
+            img = img.resize(size=(512, 1024), resample=BILINEAR) # Resizes image
+            Image.save(img_name) # Saves image
             y_pred_seg_list.append(img_name)
             pred_instance_map = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j])
             img_name = './SavedImages/output_instances_%d.png' % img_ind
-            save_image(torch.from_numpy(pred_instance_map), img_name)
+            img  = Image.fromarray(pred_instance_map) # Converts numpy array to PIL Image
+            img = img.resize(size=(512, 1024), resample=BILINEAR) # Resizes image
+            Image.save(img_name) # Saves image
             img_ind += 1
             y_pred_instance_list.append(img_name)
             y_list.append(name[j])
