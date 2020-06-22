@@ -5,7 +5,10 @@ from train import get_accuracy
 from torchvision.utils import save_image
 import os
 from dataloader import DataLoader, ValidationDataset, get_cityscapes_dataset
+from createInstanceMaps import get_centers, create_instance_maps
 from cityscapesScripts.cityscapesscripts.evaluation.evalPixelLevelSemanticLabeling import main as eval_main
+from cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling import main as eval_main2
+from deeplabv3 import DeepLabV3, Model2
 
 def inference(model, data_loader):
     model.eval()
@@ -14,31 +17,41 @@ def inference(model, data_loader):
         model.cuda()
 
     y_list = []
-    y_pred_list = []
+    y_pred_seg_list = []
+    y_pred_instance_list = []
+    y_gt_instance_list = []
     img_ind = 0
 
-
     for i, sample in enumerate(data_loader):
-        (x, y), name = sample
-        if config.use_cuda:
-            x = x.cuda()
-            y = y.cuda()
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), name = sample
 
-        y_pred = model(x)
+        if config.use_cuda:
+            image = image.cuda()
+            y_gt_seg = y_gt_seg.cuda()
+            y_gt_center = y_gt_center.cuda()
+            y_gt_regression = y_gt_regression.cuda()
+            y_gt_reg_pres = y_gt_reg_pres.cuda()
+
+        y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
         y_list.append(name)
 
-        y_pred_softmax = torch.softmax(y_pred, 1)  # should give shape (B, H, W)
-
-        for img in y_pred_softmax:
+        y_pred_seg_argmax = torch.argmax(y_pred_seg, 1)  # should give shape (B, H, W)
+        for img in y_pred_seg_argmax:
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
             save_image(img, img_name)
             img_ind += 1
-            y_pred_list.append(img_name)
+            y_pred_seg_list.append(img_name)
 
-    eval_main(y_pred_list, y_list)
+        pred_instance_map = create_instance_maps(y_pred_seg, y_pred_center, y_pred_regression) # should give shape (H, W)
 
-    print('Finished inference.')
+        img_name = './SavedImages/output_instances_%d.png' % img_ind
+        save_image(pred_instance_map, img_name)
+        img_ind += 1
+        y_pred_instance_list.append(img_name)
+
+    eval_main(y_pred_seg_list, y_list)
+    eval_main2(y_pred_instance_list, y_list)
 
 if __name__ == '__main__':
     max_epoch = 1000000
