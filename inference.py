@@ -2,13 +2,15 @@ import config
 import numpy as np
 import torch
 from train import get_accuracy
+from torch.autograd.variable import Variable
 from torchvision.utils import save_image
 import os
 from dataloader import DataLoader, ValidationDataset, get_cityscapes_dataset
-from createInstanceMaps import get_centers, create_instance_maps
-from cityscapesScripts.cityscapesscripts.evaluation.evalPixelLevelSemanticLabeling import main as eval_main
+from createInstanceMaps import create_instance_maps
+from cityscapesscripts.evaluation.evalPixelLevelSemanticLabeling import main as eval_main
 from cityscapesscripts.evaluation.evalInstanceLevelSemanticLabeling import main as eval_main2
 from deeplabv3 import DeepLabV3, Model2
+from PIL import Image
 
 def inference(model, data_loader):
     model.eval()
@@ -19,7 +21,6 @@ def inference(model, data_loader):
     y_list = []
     y_pred_seg_list = []
     y_pred_instance_list = []
-    y_gt_instance_list = []
     img_ind = 0
 
     for i, sample in enumerate(data_loader):
@@ -37,18 +38,16 @@ def inference(model, data_loader):
         y_list.append(name)
 
         y_pred_seg_argmax = torch.argmax(y_pred_seg, 1)  # should give shape (B, H, W)
-        for img in y_pred_seg_argmax:
+
+        for i in range(len(y_pred_seg_argmax)):
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
-            save_image(img, img_name)
-            img_ind += 1
+            save_image(y_pred_seg_argmax[i], img_name)
             y_pred_seg_list.append(img_name)
-
-        pred_instance_map = create_instance_maps(y_pred_seg, y_pred_center, y_pred_regression) # should give shape (H, W)
-
-        img_name = './SavedImages/output_instances_%d.png' % img_ind
-        save_image(pred_instance_map, img_name)
-        img_ind += 1
-        y_pred_instance_list.append(img_name)
+            pred_instance_map = create_instance_maps(y_pred_seg_argmax[i], y_pred_center[i].cpu().detach().numpy(), y_pred_regression[i].cpu().detach().numpy()) # should give shape (H, W)
+            img_name = './SavedImages/output_instances_%d.png' % img_ind
+            save_image(torch.from_numpy(pred_instance_map), img_name)
+            img_ind += 1
+            y_pred_instance_list.append(img_name)
 
     eval_main(y_pred_seg_list, y_list)
     eval_main2(y_pred_instance_list, y_list)
