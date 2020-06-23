@@ -102,6 +102,7 @@ class ASPP_Bottleneck(nn.Module):
 
         return out
 
+
 class ASPP_2(nn.Module):
     def __init__(self):
         super(ASPP_2, self).__init__()
@@ -148,6 +149,8 @@ class ASPP_2(nn.Module):
         out = torch.cat([out_1x1, out_3x3_1, out_3x3_2, out_3x3_3, out_img],
                         1)  # (shape: (batch_size, 1280, h/16, w/16))
         out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out)))  # (shape: (batch_size, 256, h/16, w/16))
-        out = self.conv_1x1_4(out)  # (shape: (batch_size, num_classes, h/16, w/16))
 
-        return out
+        center_pred = self.center_prediction(out)  # (shape: (batch_size, 1, h/16, w/16))
+        regression_pred = self.center_regression(out)  # (shape: (batch_size, 2, h/16, w/16))
+
+        return center_pred, regression_pred
