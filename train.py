@@ -138,6 +138,5 @@ def run_experiment():
     print('Training Finished')
 
 if __name__ == '__main__':
-    # run_experiment()
-    inference.main()
+    run_experiment()
                                                                                    
