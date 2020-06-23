@@ -1,4 +1,6 @@
 from skimage.measure import label, regionprops
+import numpy as np
+
 
 def get_centers(instance_centers, threshold=0.8):
     # creates numpy array of each instance center greater than threshold
