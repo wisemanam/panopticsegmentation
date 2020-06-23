@@ -101,19 +101,6 @@ def validation(model, data_loader, criterion1, criterion2):
 def run_experiment():
     # model = DeepLabV3('Model1', 'SimpleSegmentation/')
     model = Model2('Model2', 'SimpleSegmentation/')
-    if config.start_epoch != 1:
-        max_epoch = 0
-        min_loss = 10000000.0000
-        for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
-            model_info = filename.split('_')
-            epoch = model_info[1]
-            loss = model_info[2].split('.p')[0]
-            if float(loss) < min_loss and int(epoch) < config.start_epoch:
-                min_loss = float(loss)
-            if int(epoch) > max_epoch and int(epoch) < config.start_epoch:
-                max_epoch = int(epoch)
-        print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, min_loss))
-        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, min_loss)))['state_dict'])
     
     criterion1 = nn.CrossEntropyLoss(reduction='mean')
     criterion2 = nn.MSELoss(reduction='none')
@@ -124,7 +111,18 @@ def run_experiment():
     val_dataset = get_cityscapes_dataset(config.data_dir, False, download=True)
 
     best_loss = 1000000
-
+    if config.start_epoch != 1:
+        max_epoch = 0
+        for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
+            model_info = filename.split('_')
+            epoch = model_info[1]
+            loss = model_info[2].split('.p')[0]
+            if float(loss) < best_loss and int(epoch) < config.start_epoch:
+                best_loss = float(loss)
+            if int(epoch) > max_epoch and int(epoch) < config.start_epoch:
+                max_epoch = int(epoch)
+        print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, best_loss))
+        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, best_loss)))['state_dict'])
     for epoch in range(1, config.n_epochs + 1):
         print('Epoch', epoch)
 
