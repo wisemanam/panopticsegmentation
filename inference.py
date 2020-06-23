@@ -46,16 +46,18 @@ def inference(model, data_loader):
         y_pred_seg_softmax = torch.softmax(y_pred_seg, 1).data.cpu().numpy()
 
         for j in range(len(y_pred_seg_argmax)):
+            
+            # SAVES SEGMENTATION MAP:
             img_name_split = name[j].split('/')
             city = img_name_split[-2]
             mkdir('./SavedImages/val/Pixel/' + city)
-
             img_name = './SavedImages/val/Pixel/' + city + '/' + img_name_split[-1].replace('leftImg8bit', 'predFine_labelids')
 
             img = Image.fromarray(y_pred_seg_argmax[j].astype(np.uint8), mode='P')  # Converts numpy array to PIL Image
             img = img.resize(size=(2048, 1024), resample=Image.NEAREST)  # Resizes image
             img.save(img_name, "PNG", mode='P')  # Saves image
 
+            # SAVES INSTANCE MAP
             pred_instance_map, unique_instances, instance_probs = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j])
 
             binary_maps, inst_classes, inst_existance_probs = separate_instance_maps(y_pred_seg_argmax[j], pred_instance_map, y_pred_seg_softmax[j], unique_instances, instance_probs)
