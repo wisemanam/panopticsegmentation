@@ -66,7 +66,10 @@ import config
 def getPrediction( groundTruthFile , args ):
     # determine the prediction path, if the method is first called
     if not args.predictionPath:
+        #rootPath = '/lustre/fs0/home/kduarte/PanopticSeg/panopticsegmentation/SavedImages/val/Instance/'
+
         rootPath = './SavedImages/val/Instance/'
+        rootPath = os.path.abspath(rootPath)
 
         if not os.path.isdir(rootPath):
             printError("Could not find a result root folder. Please read the instructions of this method.")
