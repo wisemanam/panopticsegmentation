@@ -3,6 +3,7 @@ from torch import cuda
 # This file contains the configuration parameters which will be used throughout your experiments
 use_cuda = cuda.is_available()
 
+start_epoch = 1
 n_epochs = 50
 batch_size = 16
 
