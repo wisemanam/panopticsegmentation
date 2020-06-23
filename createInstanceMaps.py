@@ -13,15 +13,16 @@ def get_centers(instance_centers, threshold=0.7):
         lbl = label(thresholded)  # labeled array, connected region assigned same int value
         blobs = regionprops(lbl)  # the properties of regions in labeled array
 
-        centers = [blob.centroid for blob in blobs]
+        
+        centers = [blob.centroid for blob in blobs] # the centroid of each labeled region
         try:
-            probs = [instance_centers[int(y), int(x)] for (y, x) in centers]
+            probs = [instance_centers[int(y), int(x)] for (y, x) in centers] # list of probabilities
         except:
             print(centers)
             exit()
 
-        if len(centers) == 0:
-            threshold -= 0.1
+        if len(centers) == 0: # if no centers were found
+            threshold -= 0.1  # decrease the threshold
         else:
             found_centers = True
 
@@ -40,10 +41,10 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
 
     x, y = instance_regressions[0], instance_regressions[1] # distance from center
     
-    x_coords = np.tile(np.expand_dims(np.arange(x.shape[1]), 0), (x.shape[0], 1))+1
+    x_coords = np.tile(np.expand_dims(np.arange(x.shape[1]), 0), (x.shape[0], 1))+1 
     y_coords = np.tile(np.expand_dims(np.arange(x.shape[0]), 1), (1, x.shape[1]))+1
     
-    offset_x = x_coords - x
+    offset_x = x_coords - x 
     offset_y = y_coords - y
     
     h, w = segmentation_map.shape
@@ -51,14 +52,15 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
     unique_instances = []
     for y in range(h):
         for x in range(w):
-            seg_class = segmentation_map[y, x]
+            seg_class = segmentation_map[y, x] # class of each pixel
             if seg_class not in instance_classes:
                 continue
-            center_pred_y, center_pred_x = offset_y[y, x], offset_x[y, x]
+            center_pred_y, center_pred_x = offset_y[y, x], offset_x[y, x] 
             
             closest_dist, closest_id, closest_prob = 10000000, -1, -1
+            # finds closest center
             for i, (center_y, center_x) in enumerate(centers):
-                dist = (center_y-center_pred_y)**2 + (center_x-center_pred_x)**2
+                dist = (center_y-center_pred_y)**2 + (center_x-center_pred_x)**2 
                 if dist < closest_dist:
                     closest_dist = dist
                     closest_id = i+1
@@ -66,7 +68,7 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
             if closest_id not in unique_instances:
                 unique_instances.append(closest_id)
 
-    return instance_maps, unique_instances, probs  # Returns the instance map of shape (H, W), and unique instance ids
+    return instance_maps, unique_instances, probs  # Returns the instance map of shape (H, W), a list of unique instance ids, and a list of probabilities
     
 
 def separate_instance_maps(segmentation_map, instance_maps, segmentation_probs, unique_instances, inst_probs):
