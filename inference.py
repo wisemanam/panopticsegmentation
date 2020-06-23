@@ -44,14 +44,14 @@ def inference(model, data_loader):
             img_name = './SavedImages/output_segmentation_%d.png' % img_ind
             img = y_pred_seg_argmax[j].cpu().data.numpy()  # Converts the tensor to numpy
             img  = Image.fromarray(img) # Converts numpy array to PIL Image
-            img = img.resize(size=(512, 1024), resample=BILINEAR) # Resizes image
-            Image.save(img_name) # Saves image
+            img = img.resize(size=(512, 1024), resample=Image.NEAREST) # Resizes image
+            img.save(img_name) # Saves image
             y_pred_seg_list.append(img_name)
             pred_instance_map = create_instance_maps(y_pred_seg_argmax[j], y_pred_center[j], y_pred_regression[j])
             img_name = './SavedImages/output_instances_%d.png' % img_ind
             img  = Image.fromarray(pred_instance_map) # Converts numpy array to PIL Image
-            img = img.resize(size=(512, 1024), resample=BILINEAR) # Resizes image
-            Image.save(img_name) # Saves image
+            img = img.resize(size=(512, 1024), resample=Image.NEAREST) # Resizes image
+            img.save(img_name) # Saves image
             img_ind += 1
             y_pred_instance_list.append(img_name)
             y_list.append(name[j])
