@@ -28,7 +28,7 @@ def get_centers(instance_centers, threshold=0.7):
 
         # TODO do topk
 
-    return centers, probs  # return centroid of each region
+    return centers, probs  # return centroid of each region and list of probabilities
 
 
 def create_instance_maps(segmentation_map, instance_centers, instance_regressions):
@@ -39,13 +39,13 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
     instance_classes = [24, 25, 26, 27, 28, 29, 30, 31, 32, 33]
     centers, probs = get_centers(instance_centers)
 
-    x, y = instance_regressions[0], instance_regressions[1] # distance from center
+    x, y = instance_regressions[0], instance_regressions[1]
     
     x_coords = np.tile(np.expand_dims(np.arange(x.shape[1]), 0), (x.shape[0], 1))+1 
     y_coords = np.tile(np.expand_dims(np.arange(x.shape[0]), 1), (1, x.shape[1]))+1
     
-    offset_x = x_coords - x 
-    offset_y = y_coords - y
+    offset_x = x_coords - x # horizontal offset between pixel and center
+    offset_y = y_coords - y # vertical offset between pixel and center
     
     h, w = segmentation_map.shape
     instance_maps = np.zeros((h, w))  # instance maps are the same size as segmentation maps filled with 0s
@@ -55,7 +55,7 @@ def create_instance_maps(segmentation_map, instance_centers, instance_regression
             seg_class = segmentation_map[y, x] # class of each pixel
             if seg_class not in instance_classes:
                 continue
-            center_pred_y, center_pred_x = offset_y[y, x], offset_x[y, x] 
+            center_pred_y, center_pred_x = offset_y[y, x], offset_x[y, x] # uses offsets to locate the center
             
             closest_dist, closest_id, closest_prob = 10000000, -1, -1
             # finds closest center
