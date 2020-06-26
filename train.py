@@ -15,7 +15,7 @@ def get_accuracy(y_pred, y):
     return torch.mean((y_argmax.long()==y.long()).type(torch.float))
 
 
-def train(model, data_loader, criterion1, criterion2, optimizer):
+def train(model, data_loader, criterion1, criterion2, criterion3, optimizer):
     model.train()
 
     if config.use_cuda:
@@ -41,9 +41,11 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-        loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
-        loss += criterion2(y_pred_center, y_gt_center).mean()
-        loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
+        loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))*config.seg_coef
+
+        if config.use_instance:
+            loss += criterion2(y_pred_center, y_gt_center)*config.center_coef
+            loss += (criterion3(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()*config.regression_coef
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
 
@@ -51,6 +53,8 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
         optimizer.step()
         losses.append(loss.item())
         accs.append(acc.item())
+
+        del image, y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, loss, acc, y_pred_seg, y_pred_center, y_pred_regression
 
         if (i + 1) % 10 == 0:
             print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i + 1, float(np.mean(losses)), float(np.mean(accs))), flush=True)
@@ -60,7 +64,7 @@ def train(model, data_loader, criterion1, criterion2, optimizer):
     return float(np.mean(losses)), float(np.mean(accs))
 
 
-def validation(model, data_loader, criterion1, criterion2):
+def validation(model, data_loader, criterion1, criterion2, criterion3):
     model.eval()
 
     if config.use_cuda:
@@ -81,18 +85,25 @@ def validation(model, data_loader, criterion1, criterion2):
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
 
-        y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))
-        loss += criterion2(y_pred_center, y_gt_center).mean()
-        loss += (criterion2(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()
+        with torch.no_grad():
+            y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-        acc = get_accuracy(y_pred_seg, y_gt_seg)
+            loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))*config.seg_coef
 
-        losses.append(loss.item())
-        accs.append(acc.item())
+            if config.use_instance:
+                loss += criterion2(y_pred_center, y_gt_center)*config.center_coef
+                loss += (criterion3(y_pred_regression, y_gt_regression)*y_gt_reg_pres).mean()*config.regression_coef
 
-        if (i + 1) % 100 == 0:
-            print('Finished validating %d batches. Loss: %.4f. Accuracy: %.4f.' % (i+1, float(np.mean(losses)), float(np.mean(accs))))
+            acc = get_accuracy(y_pred_seg, y_gt_seg)
+
+            losses.append(loss.item())
+            accs.append(acc.item())
+
+            del image, y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, loss, acc, y_pred_seg, y_pred_center, y_pred_regression
+
+            if (i + 1) % 100 == 0:
+                print('Finished validating %d batches. Loss: %.4f. Accuracy: %.4f.' % (i+1, float(np.mean(losses)), float(np.mean(accs))))
+
     print('Finished validation. Loss: %.4f. Accuracy: %.4f.' % (float(np.mean(losses)), float(np.mean(accs))))
 
     return float(np.mean(losses)), float(np.mean(accs))
@@ -101,9 +112,10 @@ def validation(model, data_loader, criterion1, criterion2):
 def run_experiment():
     # model = DeepLabV3('Model1', 'SimpleSegmentation/')
     model = Model2('Model2', 'SimpleSegmentation/')
-    
+
     criterion1 = nn.CrossEntropyLoss(reduction='mean')
-    criterion2 = nn.MSELoss(reduction='none')
+    criterion2 = nn.MSELoss(reduction='mean')
+    criterion3 = nn.L1Loss(reduction='none')
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-7)
 
@@ -111,28 +123,18 @@ def run_experiment():
     val_dataset = get_cityscapes_dataset(config.data_dir, False, download=True)
 
     best_loss = 1000000
-    if config.start_epoch != 1:
-        max_epoch = 0
-        for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
-            model_info = filename.split('_')
-            epoch = model_info[1]
-            loss = model_info[2].split('.p')[0]
-            if float(loss) < best_loss and int(epoch) < config.start_epoch:
-                best_loss = float(loss)
-            if int(epoch) > max_epoch and int(epoch) < config.start_epoch:
-                max_epoch = int(epoch)
-        print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, best_loss))
-        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, best_loss)))['state_dict'])
+
     for epoch in range(1, config.n_epochs + 1):
         print('Epoch', epoch)
 
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
         val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
-        losses, _ = train(model, tr_dataloader, criterion1, criterion2, optimizer)
 
-        losses, _ = validation(model, val_dataloader, criterion1, criterion2)
+        losses, _ = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer)
 
-        if losses < best_loss:
+        losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
+
+        if epoch % 5 == 0:
             print('Model Improved -- Saving.')
             best_loss = losses
 
@@ -153,5 +155,6 @@ def run_experiment():
 
 if __name__ == '__main__':
     run_experiment()
-    
+    #inference.main()
+    print()
                                                                                    
