@@ -5,7 +5,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset
 import torch.nn as nn
 import torch.optim as optim
-from deeplabv3 import DeepLabV3, Model2
+from deeplabv3 import DeepLabV3, Model2, Model3
 import os
 
 
@@ -111,7 +111,7 @@ def validation(model, data_loader, criterion1, criterion2, criterion3):
 
 def run_experiment():
     # model = DeepLabV3('Model1', 'SimpleSegmentation/')
-    model = Model2('Model2', 'SimpleSegmentation/')
+    model = Model3('Model3', 'SimpleSegmentation/')
 
     criterion1 = nn.CrossEntropyLoss(reduction='mean')
     criterion2 = nn.MSELoss(reduction='mean')
@@ -124,6 +124,18 @@ def run_experiment():
 
     best_loss = 1000000
 
+    if config.start_epoch != 1:
+        max_epoch = 0
+        for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
+            model_info = filename.split('_')
+            epoch = model_info[1]
+            loss = model_info[2].split('.p')[0]
+            if int(epoch) > max_epoch and int(epoch) < config.start_epoch:
+                max_epoch = int(epoch)
+                max_epoch_loss = float(loss)
+        print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss))
+        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
+
     for epoch in range(1, config.n_epochs + 1):
         print('Epoch', epoch)
 
@@ -134,9 +146,10 @@ def run_experiment():
 
         losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
 
-        if epoch % 5 == 0:
+        if epoch % 5 == 0 or losses < best_loss:
             print('Model Improved -- Saving.')
-            best_loss = losses
+            if losses < best_loss:
+                best_loss = losses
 
             save_file_path = os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(epoch, losses))
             states = {
@@ -154,4 +167,6 @@ def run_experiment():
 
 
 if __name__ == '__main__':
-    run_experiment()                                                      
+    run_experiment()
+
+                                                                                   
