@@ -34,7 +34,7 @@ class seg_decoder(nn.Module):
         
         out = F.relu(self.bn_conv_1x1_2(self.conv_1x1_2(out))) # (shape: (batch_size, num_classes, h/8, w/8))
         
-        out = F.relu(self.bn_conv_5x5_1(self.conv_1x1_2(out))) # (shape: (batch_size, num_classes, h/8, w/8))
+        out = F.relu(self.bn_conv_5x5_1(self.conv_5x5_1(out))) # (shape: (batch_size, num_classes, h/8, w/8))
         out = F.upsample(out, size=(x_h*4, x_w*4), mode="bilinear") # (shape: (batch_size, num_classes, h/4, w/4))
         
         out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out))) # (shape: (batch_size, num_classes, h/4, w/4))
@@ -74,7 +74,7 @@ class inst_decoder(nn.Module):
         
         out = F.relu(self.bn_conv_1x1_2(self.conv_1x1_2(out))) # (shape: (batch_size, num_classes, h/8, w/8))
         
-        out = F.relu(self.bn_conv_5x5_1(self.conv_1x1_2(out))) # (shape: (batch_size, num_classes, h/8, w/8))
+        out = F.relu(self.bn_conv_5x5_1(self.conv_5x5_1(out))) # (shape: (batch_size, num_classes, h/8, w/8))
         out = F.upsample(out, size=(x_h*4, x_w*4), mode="bilinear") # (shape: (batch_size, num_classes, h/4, w/4))
         
         out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out))) # (shape: (batch_size, num_classes, h/4, w/4))
