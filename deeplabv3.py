@@ -1,4 +1,4 @@
-from decoder import seg_decoder, inst_decoder
+from decoder import seg_decoder, inst_decoder, seg_decoder_bn, inst_decoder_bn
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import os
 
 from resnet import ResNet18_OS16, ResNet34_OS16, ResNet50_OS16, ResNet101_OS16, ResNet152_OS16, ResNet18_OS8, ResNet34_OS8
-from aspp import ASPP, ASPP_Bottleneck, ASPP_2, ASPP2_Bottleneck, ASPP_3, ASPP3_Bottleneck
+from aspp import ASPP, ASPP_Bottleneck, ASPP_2, ASPP2_Bottleneck, ASPP_3, ASPP3_Bottleneck, ASPP_4, ASPP4_Bottleneck
 
 class DeepLabV3(nn.Module):
     def __init__(self, model_id, project_dir):
@@ -53,7 +53,7 @@ class Model2(nn.Module):
         self.project_dir = project_dir
         self.create_model_dirs()
 
-        self.resnet = ResNet101_OS16() # NOTE! specify the type of ResNet here
+        self.resnet = ResNet50_OS16() # NOTE! specify the type of ResNet here
         # self.aspp_seg = ASPP(num_classes=self.num_classes) # NOTE! if you use ResNet50-152, set self.aspp = ASPP_Bottleneck(num_classes=self.num_classes) instead
         # self.aspp = ASPP_2() # for ResNet18 and ResNet34
         self.aspp_seg = ASPP_Bottleneck(num_classes = self.num_classes) # for ResNet50 and ResNet101
@@ -101,11 +101,12 @@ class Model3(nn.Module):
         self.create_model_dirs()
 
         self.resnet = ResNet50_OS16() # NOTE! specify the type of ResNet here
-        # self.aspp_seg = ASPP(num_classes=self.num_classes) # NOTE! if you use ResNet50-152, set self.aspp = ASPP_Bottleneck(num_classes=self.num_classes) in$
-        # self.aspp = ASPP_2() # for ResNet18 and ResNet34
-        # self.aspp_seg = ASPP_Bottleneck(num_classes = self.num_classes) # for ResNet50 and ResNet101
-        # self.aspp = ASPP2_Bottleneck(num_classes=self.num_classes) # for ResNet50 and ResNet101
-        self.aspp = ASPP3_Bottleneck(num_classes=self.num_classes)
+
+        self.aspp_seg = ASPP3_Bottleneck(num_classes=self.num_classes)
+        self.aspp = ASPP4_Bottleneck(num_classes=self.num_classes)
+
+        self.segmentation_decoder = seg_decoder(num_classes=self.num_classes)
+        self.instance_decoder = inst_decoder(num_classes=self.num_classes)
     def forward(self, x):
         # (x has shape (batch_size, 3, h, w))
         h = x.size()[2]
@@ -115,15 +116,15 @@ class Model3(nn.Module):
         feature_map, skip_8, skip_4 = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNe$
 
         # Decoder for semantic segmentation:
-        output = self.aspp(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
-        decoder = seg_decoder(34)
-        output = decoder.forward(output, skip_8, skip_4)
+        output = self.aspp_seg(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
+        output = self.segmentation_decoder(output, skip_8, skip_4)
+        output = F.upsample(output, size=(h, w), mode="bilinear") # (shape: (batch_size, num_classes, h, w))
 
         # Decoder for instance segmentation:
         features = self.aspp(feature_map)
-        decoder = inst_decoder(34)
-        center, regressions = decoder.forward(features, skip_8, skip_4)
-        
+        center, regressions = self.instance_decoder(features, skip_8, skip_4)
+        center = F.upsample(center, size=(h, w), mode="bilinear")
+        regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
 
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
