@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import os
 
 from resnet import ResNet18_OS16, ResNet34_OS16, ResNet50_OS16, ResNet101_OS16, ResNet152_OS16, ResNet18_OS8, ResNet34_OS8
-from aspp import ASPP, ASPP_Bottleneck, ASPP_2, ASPP2_Bottleneck
+from aspp import ASPP, ASPP_Bottleneck, ASPP_2, ASPP2_Bottleneck, ASPP_3, ASPP3_Bottleneck
 
 class DeepLabV3(nn.Module):
     def __init__(self, model_id, project_dir):
@@ -100,29 +100,30 @@ class Model3(nn.Module):
         self.project_dir = project_dir
         self.create_model_dirs()
 
-        self.resnet = ResNet101_OS16() # NOTE! specify the type of ResNet here
+        self.resnet = ResNet50_OS16() # NOTE! specify the type of ResNet here
         # self.aspp_seg = ASPP(num_classes=self.num_classes) # NOTE! if you use ResNet50-152, set self.aspp = ASPP_Bottleneck(num_classes=self.num_classes) in$
         # self.aspp = ASPP_2() # for ResNet18 and ResNet34
-        self.aspp_seg = ASPP_Bottleneck(num_classes = self.num_classes) # for ResNet50 and ResNet101
-        self.aspp = ASPP2_Bottleneck(num_classes=self.num_classes) # for ResNet50 and ResNet101
-
+        # self.aspp_seg = ASPP_Bottleneck(num_classes = self.num_classes) # for ResNet50 and ResNet101
+        # self.aspp = ASPP2_Bottleneck(num_classes=self.num_classes) # for ResNet50 and ResNet101
+        self.aspp = ASPP3_Bottleneck(num_classes=self.num_classes)
     def forward(self, x):
         # (x has shape (batch_size, 3, h, w))
         h = x.size()[2]
         w = x.size()[3]
 
         # Encoder:
-        feature_map = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNe$
+        feature_map, skip_8, skip_4 = self.resnet(x) # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNe$
 
         # Decoder for semantic segmentation:
-        output = self.aspp_seg(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
-        output = seg_decoder(output)
+        output = self.aspp(feature_map) # (shape: (batch_size, num_classes, h/16, w/16))
+        decoder = seg_decoder(34)
+        output = decoder.forward(output, skip_8, skip_4)
 
         # Decoder for instance segmentation:
-        center, regressions = self.aspp(feature_map)
-        center = F.sigmoid(center)
-        center = inst_decoder(center)
-        regressions = inst_decoder(regressions)
+        features = self.aspp(feature_map)
+        decoder = inst_decoder(34)
+        center, regressions = decoder.forward(features, skip_8, skip_4)
+        
 
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
