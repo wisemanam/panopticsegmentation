@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import os
 from dataloader import DataLoader, get_cityscapes_dataset
-from deeplabv3 import DeepLabV3, Model2
+from deeplabv3 import DeepLabV3, Model2, Model3
 from PIL import Image
 
 
