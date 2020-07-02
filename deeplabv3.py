@@ -105,8 +105,8 @@ class Model3(nn.Module):
         self.aspp_seg = ASPP3_Bottleneck(num_classes=self.num_classes)
         self.aspp = ASPP4_Bottleneck(num_classes=self.num_classes)
 
-        self.segmentation_decoder = seg_decoder(num_classes=self.num_classes)
-        self.instance_decoder = inst_decoder(num_classes=self.num_classes)
+        self.segmentation_decoder = seg_decoder_bn(num_classes=self.num_classes)
+        self.instance_decoder = inst_decoder_bn(num_classes=self.num_classes)
     def forward(self, x):
         # (x has shape (batch_size, 3, h, w))
         h = x.size()[2]
@@ -123,6 +123,7 @@ class Model3(nn.Module):
         # Decoder for instance segmentation:
         features = self.aspp(feature_map)
         center, regressions = self.instance_decoder(features, skip_8, skip_4)
+        center = F.sigmoid(center)
         center = F.upsample(center, size=(h, w), mode="bilinear")
         regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
 
