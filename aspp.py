@@ -205,7 +205,7 @@ class ASPP2_Bottleneck(nn.Module):
         return center_pred, regression_pred
 
 class ASPP_3(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self):
         super(ASPP_3, self).__init__()
 
         self.conv_1x1_1 = nn.Conv2d(512, 256, kernel_size=1)
@@ -228,8 +228,6 @@ class ASPP_3(nn.Module):
         self.conv_1x1_3 = nn.Conv2d(1280, 256, kernel_size=1)  # (1280 = 5*256)
         self.bn_conv_1x1_3 = nn.BatchNorm2d(256)
 
-        self.conv_1x1_4 = nn.Conv2d(256, num_classes, kernel_size=1)
-
     def forward(self, feature_map):
         # (feature_map has shape (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet instead is ResNet18_OS8 or ResNet34_OS8, it will be (batch_size, 51$
 
@@ -246,16 +244,15 @@ class ASPP_3(nn.Module):
         out_img = F.upsample(out_img, size=(feature_map_h, feature_map_w),
                              mode="bilinear")  # (shape: (batch_size, 256, h/16, w/16))
 
-        # out = torch.cat([out_1x1, out_3x3_1, out_3x3_2, out_3x3_3, out_img],
-        #                1)  # (shape: (batch_size, 1280, h/16, w/16))
+        out = torch.cat([out_1x1, out_3x3_1, out_3x3_2, out_3x3_3, out_img], 1)  # (shape: (batch_size, 1280, h/16, w/16))
 
-        # out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out)))  # (shape: (batch_size, 256, h/16, w/16))
-        # out = self.conv_1x1_4(out)  # (shape: (batch_size, num_classes, h/16, w/16))
+        out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out)))  # (shape: (batch_size, 256, h/16, w/16))
 
-        return out_img
+        return out
+
 
 class ASPP3_Bottleneck(nn.Module):
-    def __init__(self, num_classes):
+    def __init__(self):
         super(ASPP3_Bottleneck, self).__init__()
 
         self.conv_1x1_1 = nn.Conv2d(4 * 512, 256, kernel_size=1)
@@ -278,8 +275,6 @@ class ASPP3_Bottleneck(nn.Module):
         self.conv_1x1_3 = nn.Conv2d(1280, 256, kernel_size=1)  # (1280 = 5*256)
         self.bn_conv_1x1_3 = nn.BatchNorm2d(256)
 
-        self.conv_1x1_4 = nn.Conv2d(256, num_classes, kernel_size=1)
-
     def forward(self, feature_map):
         # (feature_map has shape (batch_size, 4*512, h/16, w/16))
 
@@ -293,14 +288,16 @@ class ASPP3_Bottleneck(nn.Module):
 
         out_img = self.avg_pool(feature_map)  # (shape: (batch_size, 512, 1, 1))
         out_img = F.relu(self.bn_conv_1x1_2(self.conv_1x1_2(out_img)))  # (shape: (batch_size, 256, 1, 1))
-        out_img = F.upsample(out_img, size=(feature_map_h, feature_map_w), mode="bilinear")  # (shape: (batch_size, 256, h/16, w/16))
+        out_img = F.upsample(out_img, size=(feature_map_h, feature_map_w),
+                             mode="bilinear")  # (shape: (batch_size, 256, h/16, w/16))
 
         out = torch.cat([out_1x1, out_3x3_1, out_3x3_2, out_3x3_3, out_img],
                         1)  # (shape: (batch_size, 1280, h/16, w/16))
         out = F.relu(self.bn_conv_1x1_3(self.conv_1x1_3(out)))  # (shape: (batch_size, 256, h/16, w/16))
-        # out = self.conv_1x1_4(out)  # (shape: (batch_size, num_classes, h/16, w/16))
 
         return out
+
+        
 
 class ASPP_4(nn.Module):
     def __init__(self):
