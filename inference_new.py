@@ -1,10 +1,11 @@
+
 from postprocessing import PostProcessing
 import config
 import numpy as np
 import torch
 import os
 from dataloader import DataLoader, get_cityscapes_dataset
-from deeplabv3 import DeepLabV3, Model2, Model3
+from deeplabv3 import DeepLabV3, Model2, Model3, Model4
 from PIL import Image
 
 
@@ -91,15 +92,23 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    # model_60_0.4552.pth model_50_20.2748.pth
+    model = Model4('Model4', 'SimpleSegmentation/')
 
-    epoch = 30
-    loss = 0.4028
-
-    # model_10_1.2785.pth
-
-    model = Model2('Model2', 'SimpleSegmentation/')
-    model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(epoch, loss)))['state_dict'])
+    best_loss = 1000000
+    best_loss_epoch = 0
+    max_epoch = 0
+    max_epoch_loss = 0
+    for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
+        model_info = filename.split('_')
+        epoch = model_info[1]
+        loss = model_info[2].split('.p')[0]
+        if float(loss) < best_loss:
+            best_loss = float(loss)
+            best_loss_epoch = int(epoch)
+        if int(epoch) > max_epoch:
+            max_epoch = int(epoch)
+            max_epoch_loss = float(loss)
+    model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
 
     val_dataset = get_cityscapes_dataset(config.data_dir, False, download=True)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
