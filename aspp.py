@@ -227,6 +227,8 @@ class ASPP_3(nn.Module):
 
         self.conv_1x1_3 = nn.Conv2d(1280, 256, kernel_size=1)  # (1280 = 5*256)
         self.bn_conv_1x1_3 = nn.BatchNorm2d(256)
+        
+        self.drop = nn.Dropout(0.5)
 
     def forward(self, feature_map):
         # (feature_map has shape (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet instead is ResNet18_OS8 or ResNet34_OS8, it will be (batch_size, 51$
@@ -235,9 +237,16 @@ class ASPP_3(nn.Module):
         feature_map_w = feature_map.size()[3]  # (== w/16)
 
         out_1x1 = F.relu(self.bn_conv_1x1_1(self.conv_1x1_1(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_1x1 = self.drop(out_1x1)
+        
         out_3x3_1 = F.relu(self.bn_conv_3x3_1(self.conv_3x3_1(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_1 = self.drop(out_3x3_1)
+
         out_3x3_2 = F.relu(self.bn_conv_3x3_2(self.conv_3x3_2(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_2 = self.drop(out_3x3_2)
+        
         out_3x3_3 = F.relu(self.bn_conv_3x3_3(self.conv_3x3_3(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_3 = self.drop(out_3x3_3)
 
         out_img = self.avg_pool(feature_map)  # (shape: (batch_size, 512, 1, 1))
         out_img = F.relu(self.bn_conv_1x1_2(self.conv_1x1_2(out_img)))  # (shape: (batch_size, 256, 1, 1))
@@ -274,6 +283,8 @@ class ASPP3_Bottleneck(nn.Module):
 
         self.conv_1x1_3 = nn.Conv2d(1280, 256, kernel_size=1)  # (1280 = 5*256)
         self.bn_conv_1x1_3 = nn.BatchNorm2d(256)
+        
+        self.drop = nn.Dropout(0.5)
 
     def forward(self, feature_map):
         # (feature_map has shape (batch_size, 4*512, h/16, w/16))
@@ -282,9 +293,16 @@ class ASPP3_Bottleneck(nn.Module):
         feature_map_w = feature_map.size()[3]  # (== w/16)
 
         out_1x1 = F.relu(self.bn_conv_1x1_1(self.conv_1x1_1(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_1x1 = self.drop(out_1x1)
+        
         out_3x3_1 = F.relu(self.bn_conv_3x3_1(self.conv_3x3_1(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_1 = self.drop(out_3x3_1)
+        
         out_3x3_2 = F.relu(self.bn_conv_3x3_2(self.conv_3x3_2(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_2 = self.drop(out_3x3_2)
+        
         out_3x3_3 = F.relu(self.bn_conv_3x3_3(self.conv_3x3_3(feature_map)))  # (shape: (batch_size, 256, h/16, w/16))
+        out_3x3_3 = self.drop(out_3x3_3)
 
         out_img = self.avg_pool(feature_map)  # (shape: (batch_size, 512, 1, 1))
         out_img = F.relu(self.bn_conv_1x1_2(self.conv_1x1_2(out_img)))  # (shape: (batch_size, 256, 1, 1))
