@@ -5,7 +5,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset
 import torch.nn as nn
 import torch.optim as optim
-from deeplabv3 import DeepLabV3, Model2, Model3
+from deeplabv3 import DeepLabV3, Model2, Model3, Model4
 import os
 
 
@@ -111,7 +111,7 @@ def validation(model, data_loader, criterion1, criterion2, criterion3):
 
 def run_experiment():
     # model = DeepLabV3('Model1', 'SimpleSegmentation/')
-    model = Model3('Model3', 'SimpleSegmentation/')
+    model = Model4('Model4', 'SimpleSegmentation/')
 
     criterion1 = nn.CrossEntropyLoss(reduction='mean')
     criterion2 = nn.MSELoss(reduction='mean')
@@ -136,7 +136,7 @@ def run_experiment():
         print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss))
         model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
 
-    for epoch in range(1, config.n_epochs + 1):
+    for epoch in range(config.start_epoch, config.n_epochs + 1):
         print('Epoch', epoch)
 
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
