@@ -134,8 +134,7 @@ class ResNet_Bottleneck_OS16(nn.Module):
         layers = []
         for layer in self.layers:
             layers.append(layer(x))
-            x = layers[-1]
-            
+            x = layers[-1]    
         output = self.layer5(x) # (shape: (batch_size, 4*512, h/16, w/16))
 
         return output, layers[5], layers[4]
