@@ -15,7 +15,7 @@ def get_accuracy(y_pred, y):
     return torch.mean((y_argmax.long()==y.long()).type(torch.float))
 
 
-def train(model, data_loader, criterion1, criterion2, criterion3, optimizer):
+def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, iteration):
     model.train()
 
     if config.use_cuda:
@@ -37,6 +37,10 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer):
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
+        
+        iteration +=1
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = 0.001 * (1 - (iteration/60000)**0.9)
 
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
@@ -58,6 +62,22 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer):
 
         if (i + 1) % 10 == 0:
             print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i + 1, float(np.mean(losses)), float(np.mean(accs))), flush=True)
+
+        if iteration % 1000 == 0:
+            print('Model Saving.')
+
+            save_file_path = os.path.join(config.save_dir2, 'model_iteration_{}.pth'.format(iteration))
+            states = {
+                      'iteration': iteration,
+                      'state_dict': model.state_dict(),
+                      'optimizer': optimizer.state_dict()
+                     }
+            try:
+                os.mkdir(config.save_dir2)
+            except:
+                pass
+            torch.save(states, save_file_path)
+            print('Model saved ', str(save_file_path))
 
     print('Finished training. Loss: %.4f. Accuracy: %.4f.' % (float(np.mean(losses)), float(np.mean(accs))))
 
@@ -117,7 +137,7 @@ def run_experiment():
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
 
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-7)
+    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=0)
 
     tr_dataset = get_cityscapes_dataset(config.data_dir, True, download=True)
     val_dataset = get_cityscapes_dataset(config.data_dir, False, download=True)
@@ -135,16 +155,17 @@ def run_experiment():
                 max_epoch_loss = float(loss)
         print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss))
         model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
-
+        
+    iteration = 0
     for epoch in range(config.start_epoch, config.n_epochs + 1):
         print('Epoch', epoch)
 
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
         val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-        losses, _ = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer)
+        losses, _ = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer, iteration)
 
-        losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
+        #losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
 
         if epoch % 5 == 0 or losses < best_loss:
             print('Model Improved -- Saving.')
@@ -168,6 +189,5 @@ def run_experiment():
 
 if __name__ == '__main__':
     run_experiment()
-    #inference.main()
     print()
                                                                                    
