@@ -169,7 +169,7 @@ def run_experiment():
 
         #losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
 
-        if epoch % 5 == 0 or losses < best_loss:
+        if epoch % 5 == 0:
             print('Model Improved -- Saving.')
             if losses < best_loss:
                 best_loss = losses
