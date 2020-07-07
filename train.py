@@ -24,12 +24,13 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
     losses, accs = [], []
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), img_name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, segmentation_weights), img_name = sample
         image = Variable(image.type(torch.FloatTensor))
         y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
         y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
         y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
         y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
+        segmentation_weights = Variable(segmentation_weights.type(torch.FloatTensor))
 
         if config.use_cuda:
             image = image.cuda()
@@ -37,6 +38,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
+            segmentation_weights = segmentation_weights.cuda()
         
         iteration +=1
         for param_group in optimizer.param_groups:
@@ -45,7 +47,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
         optimizer.zero_grad()
         y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-        loss = criterion1(y_pred_seg, y_gt_seg.squeeze(1))*config.seg_coef
+        loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
 
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center)*config.center_coef
@@ -133,7 +135,7 @@ def run_experiment():
     # model = DeepLabV3('Model1', 'SimpleSegmentation/')
     model = Model4('Model4', 'SimpleSegmentation/')
 
-    criterion1 = nn.CrossEntropyLoss(reduction='mean')
+    criterion1 = nn.CrossEntropyLoss(reduction='none', ignore_index=255)
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
 
@@ -189,5 +191,6 @@ def run_experiment():
 
 if __name__ == '__main__':
     run_experiment()
+    #inference.main()
     print()
                                                                                    
