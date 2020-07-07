@@ -157,6 +157,7 @@ class CustomCityscapes3(Cityscapes):
         center_map = np.zeros((h, w))
         instance_regressions = np.zeros((2, h, w))
         regression_present = np.zeros((h, w))
+        segmentation_weights = np.ones((h, w))
 
         unique_values = np.unique(instance_maps)
 
@@ -173,14 +174,18 @@ class CustomCityscapes3(Cityscapes):
             center_map[y - 16: y + 17, x - 16: x + 17] = np.maximum(self.gaussian, center_map[y - 16: y + 17, x - 16: x + 17])
 
             dists = pixels - np.expand_dims(center, 1)
-
+            
             instance_regressions[:, pixels[0], pixels[1]] = dists
             regression_present[pixels[0], pixels[1]] = 1
+            
+            if pixels.shape[1] <= 64*64:
+                segmentation_weights[pixels[0], pixels[1]] = 3
 
         instance_regressions = np.concatenate((instance_regressions[1:], instance_regressions[:1]), 0)  # Changes from y-x to x-y
 
         instance_centers = np.expand_dims(center_map, 0)
         instance_present = np.expand_dims(regression_present, 0)
+        segmentation_weights = np.expand_dims(segmentation_weights, 0)
 
         image = self.to_tensor(image)
 
@@ -193,4 +198,4 @@ class CustomCityscapes3(Cityscapes):
         else:
             assert NotImplementedError, "Must have either 19 or 34 classes for Cityscapes"
 
-        return image, (segmentation_maps, instance_centers, instance_regressions, instance_present), img_name
+        return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), img_name
