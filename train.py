@@ -83,7 +83,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
 
     print('Finished training. Loss: %.4f. Accuracy: %.4f.' % (float(np.mean(losses)), float(np.mean(accs))))
 
-    return float(np.mean(losses)), float(np.mean(accs))
+    return float(np.mean(losses)), float(np.mean(accs)), iteration
 
 
 def validation(model, data_loader, criterion1, criterion2, criterion3):
@@ -156,8 +156,7 @@ def run_experiment():
                 max_epoch = int(epoch)
                 max_epoch_loss = float(loss)
         print('Loaded from: model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss))
-        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
-        
+        model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])    
     iteration = 0
     for epoch in range(config.start_epoch, config.n_epochs + 1):
         print('Epoch', epoch)
@@ -165,7 +164,7 @@ def run_experiment():
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers)
         val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
-        losses, _ = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer, iteration)
+        losses, _, iteration = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer, iteration)
 
         #losses, _ = validation(model, val_dataloader, criterion1, criterion2, criterion3)
 
@@ -190,7 +189,4 @@ def run_experiment():
 
 
 if __name__ == '__main__':
-    run_experiment()
-    #inference.main()
-    print()
-                                                                                   
+    run_experiment()                                                                  
