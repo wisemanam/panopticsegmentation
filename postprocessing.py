@@ -204,7 +204,7 @@ class PostProcessing2(nn.Module):
         self.register_buffer('xy_coords', xy_coords.unsqueeze(0))
 
         box_filter = torch.ones((1, 1, kernel_size, kernel_size))
-        # box_filter = torch.ones((1, 1, 1, 1))
+        # box_filter = torch.ones((1, 1, 1, 1)) # If using ground truth segmentations
 
         self.register_buffer('box_filter', box_filter)
 
@@ -334,6 +334,7 @@ class PostProcessing2(nn.Module):
                             right = column
             b_box_ratio = n_pixels / ((bottom - top) * (right - left))
             if b_box_ratio < threshold:
+                pass
                 # find nearest center below threshold
 
 
