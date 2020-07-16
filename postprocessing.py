@@ -320,6 +320,7 @@ class PostProcessing2(nn.Module):
             if instance == 0:
                 continue
             n_pixels = 0
+            top, bottom, left, right = [self.h, 0, self.w, 0]
             for row in range(len(inst_map)):
                 for column in range(len(inst_map[row])):
                     if inst_map[row][column] == instance:
