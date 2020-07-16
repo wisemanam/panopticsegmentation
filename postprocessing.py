@@ -334,9 +334,31 @@ class PostProcessing2(nn.Module):
                         if column > right:
                             right = column
             b_box_ratio = n_pixels / ((bottom - top) * (right - left))
+            
             if b_box_ratio < threshold:
-                instance = 0
-                # find nearest center below threshold
+                
+                # Locates center of instance
+                center_coord = [0, 0]
+                for center in sorted_coords:
+                    if inst_map[center[0]][center[1]] == instance:
+                        center_coord = center
+
+                # Finds next closest instance
+                min_dist = 10000000
+                new_instance = 0
+                for center in sorted_coords:
+                    dist = (center[0] - center_coord[0])**2 + (center[1] - center_coord[1])**2
+                    if dist < min_dist and dist != 0:
+                        min_dist = dist
+                        new_instance = inst_map[center[0]][center[1]]
+
+                # Sets all pixels in old instance to new instance
+                for row in range(len(inst_map)):
+                    for column in range(len(inst_map[row])):
+                        if inst_map[row][column] == instance:
+                            inst_map[row][column] = new_instance
+                            
+        return inst_map
 
 
     def forward(self, segmentation_probs, center_maps_placeholder, center_regressions, gt_seg=None):
