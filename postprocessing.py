@@ -314,7 +314,7 @@ class PostProcessing2(nn.Module):
             print(instance, 'num_pixels =', regressions1.shape[1], 'Mean Regressions:', torch.mean(regressions1, 1))
         return inst_map
 
-    def bbox_ratio_pruning(self, inst_map, sorted_coords, threshold = 0.3):
+    def b_box_ratio_pruning(self, inst_map, sorted_coords, threshold = 0.3):
         unique_instances = torch.unique(inst_map)
         for instance in unique_instances:
             if instance == 0:
@@ -334,7 +334,7 @@ class PostProcessing2(nn.Module):
                             right = column
             b_box_ratio = n_pixels / ((bottom - top) * (right - left))
             if b_box_ratio < threshold:
-                pass
+                instance = 0
                 # find nearest center below threshold
 
 
