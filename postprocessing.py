@@ -3,8 +3,6 @@ import torch
 import numpy as np
 import torch.nn.functional as F
 
-import matplotlib.pyplot as plt
-
 class NMS(nn.Module):
     def __init__(self, kernel_size=7, threshold=0.1, top_k=200):
         super(NMS, self).__init__()
@@ -204,7 +202,7 @@ class PostProcessing2(nn.Module):
         self.register_buffer('xy_coords', xy_coords.unsqueeze(0))
 
         box_filter = torch.ones((1, 1, kernel_size, kernel_size))
-        # box_filter = torch.ones((1, 1, 1, 1)) # If using ground truth segmentations
+        # box_filter = torch.ones((1, 1, 1, 1))
 
         self.register_buffer('box_filter', box_filter)
 
@@ -311,12 +309,13 @@ class PostProcessing2(nn.Module):
                 instance = 0
             if instance == 0:
                 continue
-            print(instance, 'num_pixels =', regressions1.shape[1], 'Mean Regressions:', torch.mean(regressions1, 1))
         return inst_map
 
-    def b_box_ratio_pruning(self, inst_map, sorted_coords, threshold = 0.3):
+    def b_box_ratio_pruning(self, inst_map, sorted_coords, center_coords_pred, things_segs, threshold = 0.3):
         unique_instances = torch.unique(inst_map)
+        good_instances = []
         for instance in unique_instances:
+            # Gets bounding box ratio
             if instance == 0:
                 continue
             n_pixels = 0
@@ -333,31 +332,15 @@ class PostProcessing2(nn.Module):
                             left = column
                         if column > right:
                             right = column
-            b_box_ratio = n_pixels / ((bottom - top) * (right - left))
-            
-            if b_box_ratio < threshold:
-                
-                # Locates center of instance
-                center_coord = [0, 0]
-                for center in sorted_coords:
-                    if inst_map[center[0]][center[1]] == instance:
-                        center_coord = center
-
-                # Finds next closest instance
-                min_dist = 10000000
-                new_instance = 0
-                for center in sorted_coords:
-                    dist = (center[0] - center_coord[0])**2 + (center[1] - center_coord[1])**2
-                    if dist < min_dist and dist != 0:
-                        min_dist = dist
-                        new_instance = inst_map[center[0]][center[1]]
-
-                # Sets all pixels in old instance to new instance
-                for row in range(len(inst_map)):
-                    for column in range(len(inst_map[row])):
-                        if inst_map[row][column] == instance:
-                            inst_map[row][column] = new_instance
-                            
+            if ((bottom - top) * (right - left)) != 0:
+                b_box_ratio = n_pixels / ((bottom - top) * (right - left))
+            else:
+                b_box_ratio = 0
+            # Puts all instances with b_box_ratio > threshold in list good_instances
+            if b_box_ratio > threshold:
+                good_instances.append(int(instance) - 1)
+        new_coords = sorted_coords[good_instances[:], :]
+        inst_map = self.create_inst_maps(center_coords_pred, new_coords, things_segs)
         return inst_map
 
 
@@ -407,7 +390,7 @@ class PostProcessing2(nn.Module):
             # removes centers with high average offsets
             inst_map = self.remove_high_mean_centers(inst_map, center_regressions, threshold=1)
 
-            # inst_map = self.b_box_ratio_pruning(inst_map, sorted_coords, threshold = 0.3)
+            inst_map = self.b_box_ratio_pruning(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
 
             instance_maps = self.separate_inst_maps(inst_map, segmentation_map[i, 0], seg_probs[i])
 
