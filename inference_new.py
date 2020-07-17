@@ -1,11 +1,11 @@
-
-from postprocessing import PostProcessing
+from postprocessing import PostProcessing, PostProcessing2
 import config
 import numpy as np
 import torch
+from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset
-from deeplabv3 import DeepLabV3, Model2, Model3, Model4
+from deeplabv3 import Model, CapsuleModel
 from PIL import Image
 
 
@@ -17,16 +17,40 @@ def mkdir(dir_name):
         os.mkdir(dir_name)
 
 
+class Converter(nn.Module):
+    def __init__(self, dims=(512, 1024)):
+        super(Converter, self).__init__()
+
+        self.zero_vals = -1000000.0
+        h, w = dims
+        eval_preds = torch.ones((1, 34, h, w), dtype=torch.float)
+
+        self.register_buffer('eval_preds', eval_preds)
+
+    def forward(self, prediction):
+        # Shape (B, C, H, W)
+        b, _, _, _ = prediction.shape
+        eval_preds = (self.eval_preds.repeat((b, 1, 1, 1)))*self.zero_vals
+
+        _CITYSCAPES_TRAIN_ID_TO_EVAL_ID = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
+
+        eval_preds[:, _CITYSCAPES_TRAIN_ID_TO_EVAL_ID] = prediction
+
+        return eval_preds
+
+
 def inference(model, data_loader):
     model.eval()
-    post = PostProcessing()
+    post = PostProcessing2(dims=(config.h, config.w), kernel_size=7, top_k=200)
+    convert_to_eval = Converter(dims=(config.h, config.w))
 
     if config.use_cuda:
         model.cuda()
         post.cuda()
+        convert_to_eval.cuda()
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres), name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), name = sample
 
         if config.use_cuda:
             image = image.cuda()
@@ -38,7 +62,10 @@ def inference(model, data_loader):
         with torch.no_grad():
             y_pred_seg, y_pred_center, y_pred_regression = model(image)
 
-            instance_map_outputs, y_pred_seg_argmax = post(y_pred_seg, y_pred_center, y_pred_regression)
+            if config.n_classes == 19:
+                y_pred_seg = convert_to_eval(y_pred_seg)
+
+            instance_map_outputs, y_pred_seg_argmax, instance_maps = post(y_pred_seg, y_pred_center, y_pred_regression)
 
         y_pred_seg_argmax = y_pred_seg_argmax.data.cpu().numpy()
 
@@ -60,11 +87,34 @@ def inference(model, data_loader):
             instance_map_output = instance_map_outputs[j]
 
             lines = []
+            
             for inst, (binary_map, inst_class, inst_prob, seg_prob, n_pixels) in enumerate(instance_map_output):
                 if n_pixels <= 0:
                     continue
-
                 binary_map = binary_map.data.cpu().numpy()
+                b_box_area = 0
+                top, bottom, left, right = [config.h, 0, config.w, 0]
+                for row in range(len(binary_map)):
+                    for column in range(len(binary_map[row])):
+                        if binary_map[row][column] == 1:
+                            if row < top:
+                                top = row
+                            if row > bottom:
+                                bottom = row
+                            if column < left:
+                                left = column
+                            if column > right:
+                                right = column
+                b_box_area = ((bottom - top) * (right - left))
+                if b_box_area != 0:
+                    b_box_ratio = n_pixels/b_box_area
+                else:
+                    b_box_ratio = 0
+                if b_box_ratio < 0.3:
+                    for row in range(len(binary_map)):
+                        for column in range(len(binary_map[row])):
+                            if binary_map[row][column] == 1:
+                                binary_map[row][column] = 0
 
                 img = Image.fromarray(binary_map, mode='L')  # Converts numpy array to PIL Image
                 img = img.resize(size=(2048, 1024), resample=Image.NEAREST)  # Resizes image
@@ -85,32 +135,29 @@ def inference(model, data_loader):
 
 
 def main():
-    # print(torch.__version__)
-    # exit()
+    #print(torch.__version__)
+    #import torchvision
+    #print(torchvision.__version__)
+    #exti()
+
     mkdir('./SavedImages/')
     mkdir('./SavedImages/val/')
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    model = Model4('Model4', 'SimpleSegmentation/')
+    # model_45_0.4305.pth  model_60_0.4552.pth model_50_20.2748.pth
 
-    best_loss = 1000000
-    best_loss_epoch = 0
-    max_epoch = 0
-    max_epoch_loss = 0
-    for filename in os.listdir('./SavedModels/Run%d/' % config.model_id):
-        model_info = filename.split('_')
-        epoch = model_info[1]
-        loss = model_info[2].split('.p')[0]
-        if float(loss) < best_loss:
-            best_loss = float(loss)
-            best_loss_epoch = int(epoch)
-        if int(epoch) > max_epoch:
-            max_epoch = int(epoch)
-            max_epoch_loss = float(loss)
-    model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_{}_{:.4f}.pth'.format(max_epoch, max_epoch_loss)))['state_dict'])
+    iteration = 55000
 
-    val_dataset = get_cityscapes_dataset(config.data_dir, False, download=True)
+    # model_10_1.2785.pth
+    if config.model == 'CapsuleModel':
+        model = CapsuleModel('CapsuleModel', 'SimpleSegmentation/')
+    else:
+        model = Model('Model', 'SimpleSegmentation/')
+
+    model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
+
+    val_dataset = get_cityscapes_dataset(config.data_dir, False)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
 
     inference(model, val_dataloader)
