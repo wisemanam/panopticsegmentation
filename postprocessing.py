@@ -299,16 +299,23 @@ class PostProcessing2(nn.Module):
 
         return inst_maps
 
-    def remove_high_mean_centers(self, inst_map, regressions, threshold=1):
+    def remove_high_mean_centers(self, inst_map, regressions, things_segs, center_coords_pred, threshold=10):
         # Removes instances with average offsets above a given threshold
         unique_instances = torch.unique(inst_map)
+        good_instances = []
         for instance in unique_instances:
-            regressions = regressions.squeeze()  # shape: (2, H, W) # regressions for all instances
-            regressions1 = regressions[:, inst_map == instance]  # shape: (2, N) # regressions for instances
-            if abs(torch.mean(regressions1, 1)[0].item()) > threshold or abs(torch.mean(regressions1, 1)[1].item()) > threshold:
-                instance = 0
             if instance == 0:
                 continue
+            regressions = regressions.squeeze()  # shape: (2, H, W) # regressions for all instances
+            regressions1 = regressions[:, inst_map == instance]  # shape: (2, N) # regressions for instances
+            mean_regression = torch.mean(regressions1, 1)
+            if torch.abs(mean_regression[0]) < threshold and torch.abs(mean_regression[1]) < threshold:
+                good_instances.append(instance)
+        new_coords = sorted_coords[good_instances[:], :]
+        # print('good_instances:', good_instances)
+        # print('new_coords:', new_coords)
+        # exit()
+        inst_map = self.create_inst_maps(center_coords_pred, new_coords, things_segs)
         return inst_map
 
     def b_box_ratio_pruning(self, inst_map, sorted_coords, center_coords_pred, things_segs, threshold = 0.3):
@@ -336,9 +343,12 @@ class PostProcessing2(nn.Module):
                 b_box_ratio = n_pixels / ((bottom - top) * (right - left))
             else:
                 b_box_ratio = 0
+           
             # Puts all instances with b_box_ratio > threshold in list good_instances
             if b_box_ratio > threshold:
                 good_instances.append(int(instance) - 1)
+        if len(good_instances) == 0:
+            return inst_map
         new_coords = sorted_coords[good_instances[:], :]
         inst_map = self.create_inst_maps(center_coords_pred, new_coords, things_segs)
         return inst_map
@@ -387,10 +397,10 @@ class PostProcessing2(nn.Module):
 
             inst_map = self.create_inst_maps(center_coords_pred[i], sorted_coords, things_segs[i, 0])
 
-            # removes centers with high average offsets
-            inst_map = self.remove_high_mean_centers(inst_map, center_regressions, threshold=1)
-
             inst_map = self.b_box_ratio_pruning(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
+            
+            # removes centers with high average offsets
+            # inst_map = self.remove_high_mean_centers(inst_map, center_regressions, things_segs[i, 0], center_coords_pred[i], threshold=10)
 
             instance_maps = self.separate_inst_maps(inst_map, segmentation_map[i, 0], seg_probs[i])
 
