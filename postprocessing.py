@@ -387,7 +387,7 @@ class PostProcessing2(nn.Module):
             inst_map = self.b_box_ratio_pruning2(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
 
             # removes centers with high average offsets
-            inst_map = self.remove_high_mean_centers(inst_map, center_regressions, things_segs[i, 0], center_coords_pred[i], sorted_coords, threshold=10)
+            inst_map = self.remove_high_mean_centers(inst_map, center_regressions[i: i+1], things_segs[i, 0], center_coords_pred[i], sorted_coords, threshold=10)
 
             instance_maps = self.separate_inst_maps(inst_map, segmentation_map[i, 0], seg_probs[i])
 
