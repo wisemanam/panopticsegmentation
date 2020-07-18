@@ -299,7 +299,7 @@ class PostProcessing2(nn.Module):
 
         return inst_maps
 
-    def remove_high_mean_centers(self, inst_map, regressions, things_segs, center_coords_pred, threshold=10):
+    def remove_high_mean_centers(self, inst_map, regressions, things_segs, center_coords_pred, sorted_coords, threshold=10):
         # Removes instances with average offsets above a given threshold
         unique_instances = torch.unique(inst_map)
         good_instances = []
@@ -312,47 +312,34 @@ class PostProcessing2(nn.Module):
             if torch.abs(mean_regression[0]) < threshold and torch.abs(mean_regression[1]) < threshold:
                 good_instances.append(instance)
         new_coords = sorted_coords[good_instances[:], :]
-        # print('good_instances:', good_instances)
-        # print('new_coords:', new_coords)
-        # exit()
         inst_map = self.create_inst_maps(center_coords_pred, new_coords, things_segs)
         return inst_map
 
-    def b_box_ratio_pruning(self, inst_map, sorted_coords, center_coords_pred, things_segs, threshold = 0.3):
+    def b_box_ratio_pruning2(self, inst_map, sorted_coords, center_coords_pred, things_segs, threshold = 0.3):
         unique_instances = torch.unique(inst_map)
         good_instances = []
         for instance in unique_instances:
             # Gets bounding box ratio
             if instance == 0:
                 continue
-            n_pixels = 0
-            top, bottom, left, right = [self.h, 0, self.w, 0]
-            for row in range(len(inst_map)):
-                for column in range(len(inst_map[row])):
-                    if inst_map[row][column] == instance:
-                        n_pixels += 1
-                        if row < top:
-                            top = row
-                        if row > bottom:
-                            bottom = row
-                        if column < left:
-                            left = column
-                        if column > right:
-                            right = column
-            if ((bottom - top) * (right - left)) != 0:
-                b_box_ratio = n_pixels / ((bottom - top) * (right - left))
-            else:
-                b_box_ratio = 0
-           
-            # Puts all instances with b_box_ratio > threshold in list good_instances
+            
+            y, x = torch.where(inst_map == instance)
+            n_pixels = x.shape[0]
+            bottom = y.max()
+            top = y.min()
+            left = x.min()
+            right = x.max()
+            
+            b_box_ratio = n_pixels / ((bottom - top+1.0) * (right - left+1.0))
+            
             if b_box_ratio > threshold:
-                good_instances.append(int(instance) - 1)
+                good_instances.append(int(instance) -1)
+               
         if len(good_instances) == 0:
             return inst_map
         new_coords = sorted_coords[good_instances[:], :]
         inst_map = self.create_inst_maps(center_coords_pred, new_coords, things_segs)
         return inst_map
-
 
     def forward(self, segmentation_probs, center_maps_placeholder, center_regressions, gt_seg=None):
         # center_regressions should be of shape (B, 2, H, W)
@@ -397,10 +384,10 @@ class PostProcessing2(nn.Module):
 
             inst_map = self.create_inst_maps(center_coords_pred[i], sorted_coords, things_segs[i, 0])
 
-            inst_map = self.b_box_ratio_pruning(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
-            
+            inst_map = self.b_box_ratio_pruning2(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
+
             # removes centers with high average offsets
-            # inst_map = self.remove_high_mean_centers(inst_map, center_regressions, things_segs[i, 0], center_coords_pred[i], threshold=10)
+            inst_map = self.remove_high_mean_centers(inst_map, center_regressions, things_segs[i, 0], center_coords_pred[i], sorted_coords, threshold=10)
 
             instance_maps = self.separate_inst_maps(inst_map, segmentation_map[i, 0], seg_probs[i])
 
