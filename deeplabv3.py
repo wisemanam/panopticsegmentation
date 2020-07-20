@@ -65,10 +65,9 @@ class Model(nn.Module):
             os.makedirs(self.model_dir)
             os.makedirs(self.checkpoints_dir)
 
-
 class Model2(nn.Module):
     def __init__(self, model_id, project_dir):
-        super(Model, self).__init__()
+        super(Model2, self).__init__()
         self.num_classes = config.n_classes
         self.model_id = model_id
         self.project_dir = project_dir
@@ -78,13 +77,13 @@ class Model2(nn.Module):
 
         self.aspp = ASPP_Bottleneck()
 
-        in_feats = 1280
-
+        in_feats = 16*4*4
+            
         self.primary_caps = PrimaryCaps(in_feats, 32, (1, 1))
         self.caps_pooling = CapsulePooling((3,3), (1, 1), (1, 1))
 
         self.class_capsules = ConvCaps(32, 16, (1,1), padding=None)
-
+            
         self.segmentation_decoder = seg_decoder(in_feats=in_feats, num_classes=self.num_classes)
         self.instance_decoder = inst_decoder(in_feats=in_feats)
 
@@ -95,7 +94,8 @@ class Model2(nn.Module):
 
         # Encoder:
         feature_map, skip_8, skip_4 = self.resnet(x)  # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNe$
-
+    
+        # Capsules
         output = self.aspp(feature_map)  # (shape: (batch_size, 256, h/16, w/16))
 
         primary_capsules = self.primary_caps(output)  # (batch_size, h/16, w/16, 32*(4*4+1))
@@ -109,6 +109,7 @@ class Model2(nn.Module):
         p = 4
 
         poses, activations = class_capsules[..., :c*p*p], class_capsules[..., c*p*p:]  # Shapes (batch_size, h/16, w/16, C*4*4) and (batch_size, h/16, w/16, C)
+        poses = poses.permute(0, 3, 1, 2).contiguous()
 
         # Decoder for semantic segmentation:
         output = self.segmentation_decoder(poses, skip_8, skip_4)
