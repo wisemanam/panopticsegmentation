@@ -30,8 +30,7 @@ def custom_collate(batch):
        instance_present.append(torch.tensor(instance_present1))
        segmentation_weights.append(torch.tensor(segmentation_weights1))
        class_list.append(torch.tensor(class_list1))
-       for i in range(config.batch_size):
-           point_list.append(torch.tensor(point_list1[i]))
+       point_list.append(point_list1)
        image_name.append(image_name1)
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
