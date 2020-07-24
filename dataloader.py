@@ -22,15 +22,16 @@ def custom_collate(batch):
     class_list = []
     point_list = []
     image_name = []
-    for image1, (segmentation_maps1, instance_centers1, instance_regressions1, instance_present1, segmentation_weights1), class_list1, point_list1, img_name1 in batch:
+    for image1, (segmentation_maps1, instance_centers1, instance_regressions1, instance_present1, segmentation_weights1), class_list1, point_list1, image_name1 in batch:
        image.append(image1)
-       segmentation_maps.append(segmentation_maps1)
-       instance_centers.append(instance_centers1)
-       instance_regressions.append(instance_regressions1)
-       instance_present.append(instance_present1)
-       segmentation_weights.append(segmentation_weights1)
-       class_list.append(torch.stack(class_list1))
-       point_list.append(point_list1)
+       segmentation_maps.append(torch.tensor(segmentation_maps1))
+       instance_centers.append(torch.tensor(instance_centers1))
+       instance_regressions.append(torch.tensor(instance_regressions1))
+       instance_present.append(torch.tensor(instance_present1))
+       segmentation_weights.append(torch.tensor(segmentation_weights1))
+       class_list.append(torch.tensor(class_list1))
+       for i in range(config.batch_size):
+           point_list.append(torch.tensor(point_list1[i]))
        image_name.append(image_name1)
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
@@ -38,9 +39,9 @@ def custom_collate(batch):
     instance_regressions = torch.stack(instance_regressions)
     instance_present = torch.stack(instance_present)
     segmentation_weights = torch.stack(segmentation_weights)
-    image_name = torch.stack(image_name)
+    # image_name = torch.stack(image_name)
 
-    return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, img_name
+    return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
 
 
 
