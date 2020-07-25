@@ -296,18 +296,27 @@ class CapsuleModel2(nn.Module):
         regressions[:, 0] = regressions[:, 0] * w
         regressions[:, 1] = regressions[:, 1] * h
 
+
         class_outputs = []
         for i, point_list in enumerate(point_lists):
+            print(len(point_list))
             class_outs = []
-            for inst_points in point_lists:
+            for inst_points in point_list:
 
                 # gather capsules corresponding to inst_points
-                inst_points = torch.tensor(inst_points)
-                inst_points = torch.unique(inst_points, dim=0)
-
-                y_coords, x_coords = inst_points[:, 0], inst_points[:, 1]
-                y_coords = torch.tensor([y//16 for y in y_coords])
-                x_coords = torch.tensor([x//16 for x in x_coords])
+                # print(inst_points)
+                # print(inst_points.shape, inst_points.dtype)
+                # inst_points = torch.Tensor(inst_points)
+                # print(inst_points.shape)
+                inst_points = torch.unique(inst_points//16, dim=1)
+                #print(inst_points.shape)
+                 
+                y_coords, x_coords = inst_points[0, :], inst_points[1, :]
+                # y_coords = torch.tensor([y//16 for y in y_coords])
+                # x_coords = torch.tensor([x//16 for x in x_coords])
+                #print(y_coords.min(), y_coords.max())
+                #print(x_coords.min(), x_coords.max())
+                #print(class_capsules.shape)
                 inst_capsules = class_capsules[i, y_coords, x_coords, :]
 
                 # perform routing on inst capsules to get class capsules
@@ -319,7 +328,10 @@ class CapsuleModel2(nn.Module):
                 # print(class_output.shape)
                 
                 class_outs.append(class_output)
-            class_outputs.append(torch.stack(class_outs))
+            # print(len(class_outs))
+            class_outputs.append(torch.stack(class_outs) if len(class_outs) != 0 else [])
+            # print(len(class_outputs[-1]))
+
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
         return output, center, regressions, class_outputs
