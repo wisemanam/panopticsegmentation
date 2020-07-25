@@ -297,26 +297,25 @@ class CapsuleModel2(nn.Module):
         regressions[:, 1] = regressions[:, 1] * h
 
         class_outputs = []
-        print('point_lists.shape:', point_lists.shape)
         for i, point_list in enumerate(point_lists):
-            print('point_list.shape:', point_list.shape)
             class_outs = []
             for inst_points in point_lists:
 
                 # gather capsules corresponding to inst_points
-                inst_points = torch.unique(inst_points//16, dim=0)
-                print('inst_points.shape:', inst_points.shape)
+                inst_points = torch.tensor(inst_points)
+                inst_points = torch.unique(inst_points, dim=0)
+
                 y_coords, x_coords = inst_points[:, 0], inst_points[:, 1]
-                print('y_coords.shape:', y_coords.shape)
-                print('x_coords.shape:',x_coords.shape)
+                y_coords = torch.tensor([y//16 for y in y_coords])
+                x_coords = torch.tensor([x//16 for x in x_coords])
                 inst_capsules = class_capsules[i, y_coords, x_coords, :]
 
                 # perform routing on inst capsules to get class capsules
                 pooled_inst_caps = torch.mean(inst_capsules, 0)
-                class_capsules = self.linear(pooled_inst_caps)
+                linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
-                class_output = F.sigmoid(class_capsules)
+                class_output = F.sigmoid(linear_class_capsules)
                 # print(class_output.shape)
                 
                 class_outs.append(class_output)
