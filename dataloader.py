@@ -30,7 +30,7 @@ def custom_collate(batch):
        instance_present.append(torch.tensor(instance_present1))
        segmentation_weights.append(torch.tensor(segmentation_weights1))
        class_list.append(torch.tensor(class_list1))
-       point_list.append(point_list1)
+       point_list.append(point_list1) # point_list1 is a list of 4 (2, N) numpy arrays
        image_name.append(image_name1)
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
@@ -120,7 +120,7 @@ class CustomCityscapes(Cityscapes):
         class_list = []
         for instance in instance_values:
             pixels = np.stack(np.where(instance_maps == instance))
-            
+
             point_list.append(pixels)
 
             center = np.round(np.mean(pixels, 1)).astype(np.int32)  # gives the center (y, x)
