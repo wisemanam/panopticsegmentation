@@ -40,6 +40,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
             segmentation_weights = segmentation_weights.cuda()
+            gt_class_list = [i.cuda() if len(i) != 0 else [] for i in gt_class_list]
 
         iteration += 1
         if config.poly_lr_scheduler:
@@ -53,7 +54,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
         
         #  loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for i in range(len(gt_class_list)):
-            loss += criterion1(pred_class_list[i], gt_class_list[i])
+            if len(gt_class_list[i]) > 0:
+                loss += criterion1(pred_class_list[i], gt_class_list[i]).mean()
             
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
