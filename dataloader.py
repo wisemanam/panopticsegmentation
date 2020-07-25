@@ -29,8 +29,8 @@ def custom_collate(batch):
        instance_regressions.append(torch.tensor(instance_regressions1))
        instance_present.append(torch.tensor(instance_present1))
        segmentation_weights.append(torch.tensor(segmentation_weights1))
-       class_list.append(torch.tensor(class_list1))
-       point_list.append(point_list1) # point_list1 is a list of 4 (2, N) numpy arrays
+       class_list.append(torch.tensor(class_list1).long() if class_list1 != [] else [])
+       point_list.append([torch.Tensor(item).long() for item in point_list1]) # point_list1 is a list of 4 tensors (2, N)
        image_name.append(image_name1)
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
@@ -39,7 +39,8 @@ def custom_collate(batch):
     instance_present = torch.stack(instance_present)
     segmentation_weights = torch.stack(segmentation_weights)
     # image_name = torch.stack(image_name)
-
+    #print(point_list)
+    #print(image.shape)
     return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
 
 
@@ -120,6 +121,7 @@ class CustomCityscapes(Cityscapes):
         class_list = []
         for instance in instance_values:
             pixels = np.stack(np.where(instance_maps == instance))
+            # print(pixels.shape)
 
             point_list.append(pixels)
 
