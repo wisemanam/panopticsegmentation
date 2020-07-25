@@ -53,9 +53,9 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
         loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
         
         #  loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
-        for i in range(len(gt_class_list)):
-            if len(gt_class_list[i]) > 0:
-                loss += criterion1(pred_class_list[i], gt_class_list[i]).mean()
+        for j in range(len(gt_class_list)):
+            if len(gt_class_list[j]) > 0:
+                loss += criterion1(pred_class_list[j], gt_class_list[j]).mean()
             
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
