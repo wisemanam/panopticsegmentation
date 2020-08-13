@@ -8,6 +8,6 @@ module load anaconda/anaconda3
 source activate pytorch-gpu
 
 python3 inference.py
-python3 evalPixelLevelSemanticLabeling.py
+# python3 evalPixelLevelSemanticLabeling.py
 python3 evalInstanceLevelSemanticLabeling.py
 
