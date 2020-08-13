@@ -148,10 +148,10 @@ class CustomCityscapes(Cityscapes):
             if class_i in class_list:
                 class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
                 class_i_regressions = instance_regressions[:, class_i_pixels[0], class_i_pixels[1]] # get regressions corresponding to class_i_pixels
-                class_regressions.append(class_i_regressions) # append regression map
+                class_regressions.append(np.array(class_i_regressions)) # append regression map
             else:
                 class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
-        instance_regressions = np.stack(np.array(class_regressions))
+        instance_regressions = np.stack(class_regressions)
         print(instance_regressions.shape)
         
         
