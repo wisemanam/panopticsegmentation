@@ -299,7 +299,7 @@ class CapsuleModel2(nn.Module):
 
         class_outputs = []
         for i, point_list in enumerate(point_lists):
-            print(len(point_list))
+            # print(len(point_list))
             class_outs = []
             for inst_points in point_list:
 
