@@ -32,15 +32,14 @@ def custom_collate(batch):
        class_list.append(torch.tensor(class_list1).long() if class_list1 != [] else [])
        point_list.append([torch.Tensor(item).long() for item in point_list1]) # point_list1 is a list of 4 tensors (2, N)
        image_name.append(image_name1)
+       
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
     instance_centers = torch.stack(instance_centers)
     instance_regressions = torch.stack(instance_regressions)
     instance_present = torch.stack(instance_present)
     segmentation_weights = torch.stack(segmentation_weights)
-    # image_name = torch.stack(image_name)
-    #print(point_list)
-    #print(image.shape)
+    
     return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
 
 
@@ -119,9 +118,9 @@ class CustomCityscapes(Cityscapes):
 
         point_list = []
         class_list = []
+        
         for instance in instance_values:
             pixels = np.stack(np.where(instance_maps == instance))
-            # print(pixels.shape)
 
             point_list.append(pixels)
 
@@ -141,7 +140,21 @@ class CustomCityscapes(Cityscapes):
 
             if pixels.shape[1] <= 64 * 64:
                 segmentation_weights[pixels[0], pixels[1]] = 3
-
+        
+        
+        # ADDED TO PREDICT REGRESSIONS BY CLASS:
+        class_regressions = []
+        for class_i in range(config.n_classes + 1):
+            if class_i in class_list:
+                class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
+                class_i_regressions = instance_regressions[:, class_i_pixels[0], class_i_pixels[1]] # get regressions corresponding to class_i_pixels
+                class_regressions.append(class_i_regressions) # append regression map
+            else:
+                class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
+        instance_regressions = np.stack(np.array(class_regressions))
+        print(instance_regressions.shape)
+        
+        
         instance_regressions = np.concatenate((instance_regressions[1:], instance_regressions[:1]), 0)  # Changes from y-x to x-y
 
         instance_centers = np.expand_dims(center_map, 0)
