@@ -1,11 +1,12 @@
-from postprocessing import PostProcessing, PostProcessing2
+from postprocessing import PostProcessing, PostProcessing2, PostProcessing3
+from postprocessing4 import PostProcessing4
 import config
 import numpy as np
 import torch
 from torch import nn
 import os
-from dataloader import DataLoader, get_cityscapes_dataset
-from deeplabv3 import Model, CapsuleModel
+from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
+from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2
 from PIL import Image
 
 
@@ -38,10 +39,22 @@ class Converter(nn.Module):
 
         return eval_preds
 
+def get_points(instance_maps):
+    # instance_maps is a list of N (h, w) tensors, N being the number of instances in the image
+    point_lists = []
+    for i, inst_map in enumerate(instance_maps):
+        point_list = []
+        unique_insts = torch.unique(inst_map)
+        inst_map = inst_map.cpu()
+        for inst in unique_insts:
+            pixels = np.stack(np.where(inst_map == inst))
+            point_list.append(torch.Tensor(pixels).long())
+        point_lists.append(point_list)
+    return point_lists
 
 def inference(model, data_loader):
     model.eval()
-    post = PostProcessing2(dims=(config.h, config.w), kernel_size=7, top_k=200)
+    post = PostProcessing4(dims=(config.h, config.w), kernel_size=7, top_k=200, circle_radius=7)
     convert_to_eval = Converter(dims=(config.h, config.w))
 
     if config.use_cuda:
@@ -50,7 +63,7 @@ def inference(model, data_loader):
         convert_to_eval.cuda()
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), gt_class_list, gt_point_list, name = sample
 
         if config.use_cuda:
             image = image.cuda()
@@ -58,14 +71,20 @@ def inference(model, data_loader):
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
+            gt_class_list = [i.cuda() if len(i) != 0 else [] for i in gt_class_list]
 
         with torch.no_grad():
-            y_pred_seg, y_pred_center, y_pred_regression = model(image)
+            # y_pred_seg, y_pred_center, y_pred_regression = model(image)
+            y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg)
 
             if config.n_classes == 19:
                 y_pred_seg = convert_to_eval(y_pred_seg)
 
-            instance_map_outputs, y_pred_seg_argmax, instance_maps = post(y_pred_seg, y_pred_center, y_pred_regression)
+            instance_map_outputs, y_pred_seg_argmax, instance_maps = post(y_pred_seg, y_pred_center, y_pred_regression, y_gt_seg.float())
+            
+            points = get_points(instance_maps)
+
+            y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, points, y_gt_seg)
 
         y_pred_seg_argmax = y_pred_seg_argmax.data.cpu().numpy()
 
@@ -92,29 +111,6 @@ def inference(model, data_loader):
                 if n_pixels <= 0:
                     continue
                 binary_map = binary_map.data.cpu().numpy()
-                b_box_area = 0
-                top, bottom, left, right = [config.h, 0, config.w, 0]
-                for row in range(len(binary_map)):
-                    for column in range(len(binary_map[row])):
-                        if binary_map[row][column] == 1:
-                            if row < top:
-                                top = row
-                            if row > bottom:
-                                bottom = row
-                            if column < left:
-                                left = column
-                            if column > right:
-                                right = column
-                b_box_area = ((bottom - top) * (right - left))
-                if b_box_area != 0:
-                    b_box_ratio = n_pixels/b_box_area
-                else:
-                    b_box_ratio = 0
-                if b_box_ratio < 0.3:
-                    for row in range(len(binary_map)):
-                        for column in range(len(binary_map[row])):
-                            if binary_map[row][column] == 1:
-                                binary_map[row][column] = 0
 
                 img = Image.fromarray(binary_map, mode='L')  # Converts numpy array to PIL Image
                 img = img.resize(size=(2048, 1024), resample=Image.NEAREST)  # Resizes image
@@ -138,7 +134,7 @@ def main():
     #print(torch.__version__)
     #import torchvision
     #print(torchvision.__version__)
-    #exti()
+    #exit()
 
     mkdir('./SavedImages/')
     mkdir('./SavedImages/val/')
@@ -147,18 +143,18 @@ def main():
 
     # model_45_0.4305.pth  model_60_0.4552.pth model_50_20.2748.pth
 
-    iteration = 55000
+    iteration = 60000
 
     # model_10_1.2785.pth
     if config.model == 'CapsuleModel':
-        model = CapsuleModel('CapsuleModel', 'SimpleSegmentation/')
+        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
     else:
-        model = Model('Model', 'SimpleSegmentation/')
+        model = Model2('Model', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
     val_dataset = get_cityscapes_dataset(config.data_dir, False)
-    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers)
+    val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=custom_collate)
 
     inference(model, val_dataloader)
 
