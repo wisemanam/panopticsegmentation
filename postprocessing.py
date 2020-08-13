@@ -201,8 +201,8 @@ class PostProcessing2(nn.Module):
 
         self.register_buffer('xy_coords', xy_coords.unsqueeze(0))
 
-        # box_filter = torch.ones((1, 1, kernel_size, kernel_size))
-        box_filter = torch.ones((1, 1, 1, 1))
+        box_filter = torch.ones((1, 1, kernel_size, kernel_size))
+        # box_filter = torch.ones((1, 1, 1, 1))
 
         self.register_buffer('box_filter', box_filter)
 
@@ -288,6 +288,7 @@ class PostProcessing2(nn.Module):
             inst_map = instance_map == inst
 
             seg_ids, seg_counts = torch.unique(segmentation_map[inst_map], return_counts=True)
+            # print(seg_ids)
 
             inst_class = int(seg_ids[torch.argsort(seg_counts)[-1]])
 
@@ -386,10 +387,10 @@ class PostProcessing2(nn.Module):
 
             inst_map = self.create_inst_maps(center_coords_pred[i], sorted_coords, things_segs[i, 0])
 
-            inst_map = self.b_box_ratio_pruning2(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
+            # inst_map = self.b_box_ratio_pruning2(inst_map, sorted_coords, center_coords_pred[i], things_segs[i, 0], threshold = 0.3)
 
             # removes centers with high average offsets
-            inst_map = self.remove_high_mean_centers(inst_map, center_regressions[i:i+1], things_segs[i, 0], center_coords_pred[i], sorted_coords, threshold=10)
+            # inst_map = self.remove_high_mean_centers(inst_map, center_regressions[i:i+1], things_segs[i, 0], center_coords_pred[i], sorted_coords, threshold=10)
 
             instance_maps = self.separate_inst_maps(inst_map, segmentation_map[i, 0], seg_probs[i])
 
@@ -428,11 +429,13 @@ class PostProcessing3(nn.Module):
         self.register_buffer('xy_coords', xy_coords.unsqueeze(0))
 
         self.kernel_size_aggr = 1
-        box_filter = torch.ones((1, 1, self.kernel_size_aggr, self.kernel_size_aggr))
+        
+        #box_filter = torch.ones((1, 1, self.kernel_size_aggr, self.kernel_size_aggr))
+        box_filter = torch.ones((1, 1, 1, 1))
 
         self.register_buffer('box_filter', box_filter)
 
-        self.thresh_center = nn.Threshold(10, 0)
+        self.thresh_center = nn.Threshold(50, 0)
 
         self.things_classes = list(range(24, 34))
 
@@ -526,6 +529,7 @@ class PostProcessing3(nn.Module):
             inst_map = instance_map == inst
 
             seg_ids, seg_counts = torch.unique(segmentation_map[inst_map], return_counts=True)
+            # print(seg_ids)
 
             inst_class = int(seg_ids[torch.argsort(seg_counts)[-1]])
 
@@ -598,6 +602,7 @@ class PostProcessing3(nn.Module):
 
         instance_maps = []
         for class_i in self.things_classes:
+    
             vote_map, things_segs = self.get_vote_map(center_coords_pred, segmentation_map, class_i)  # (B, 1, H, W)
 
             # performs operation to sum all nearby votes (since not all votes are exactly on the center)
@@ -639,7 +644,7 @@ class PostProcessing3(nn.Module):
 
         inst_maps_color = []
         outputs = []
-        for inst_map in instance_maps:
+        for i, inst_map in enumerate(instance_maps):
             inst_map = self.convert_to_color(inst_map)
             inst_maps_color.append(inst_map)
 
