@@ -141,13 +141,15 @@ class CustomCityscapes(Cityscapes):
             if pixels.shape[1] <= 64 * 64:
                 segmentation_weights[pixels[0], pixels[1]] = 3
         
-        
+        segmentation_maps = np.expand_dims(np.array(segmentation_maps), 0)  # (H, W)
+
         # ADDED TO PREDICT REGRESSIONS BY CLASS:
         class_regressions = []
         for class_i in range(config.n_classes + 1):
             if class_i in class_list:
                 class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
-                class_i_regressions = instance_regressions[:, class_i_pixels[0], class_i_pixels[1]] # get regressions corresponding to class_i_pixels
+                class_i_mask = (segmentation_maps == class_i).astype(np.float32)
+                class_i_regressions = instance_regressions*class_i_mask # get regressions corresponding to class_i_pixels
                 class_regressions.append(np.array(class_i_regressions)) # append regression map
             else:
                 class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
@@ -162,8 +164,6 @@ class CustomCityscapes(Cityscapes):
         segmentation_weights = np.expand_dims(segmentation_weights, 0)
 
         image = self.to_tensor(image)
-
-        segmentation_maps = np.expand_dims(np.array(segmentation_maps), 0)  # (H, W)
 
         if config.n_classes == 19:
             segmentation_maps[segmentation_maps == 255] = 0
