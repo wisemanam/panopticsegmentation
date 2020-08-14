@@ -154,7 +154,6 @@ class CustomCityscapes(Cityscapes):
             else:
                 class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
         instance_regressions = np.stack(class_regressions)
-        print(instance_regressions.shape)
         
         
         instance_regressions = np.concatenate((instance_regressions[1:], instance_regressions[:1]), 0)  # Changes from y-x to x-y
