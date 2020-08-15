@@ -32,14 +32,12 @@ def custom_collate(batch):
        class_list.append(torch.tensor(class_list1).long() if class_list1 != [] else [])
        point_list.append([torch.Tensor(item).long() for item in point_list1]) # point_list1 is a list of 4 tensors (2, N)
        image_name.append(image_name1)
-       
     image = torch.stack(image)
     segmentation_maps = torch.stack(segmentation_maps)
     instance_centers = torch.stack(instance_centers)
     instance_regressions = torch.stack(instance_regressions)
     instance_present = torch.stack(instance_present)
     segmentation_weights = torch.stack(segmentation_weights)
-    
     return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
 
 
@@ -118,7 +116,7 @@ class CustomCityscapes(Cityscapes):
 
         point_list = []
         class_list = []
-        
+
         for instance in instance_values:
             pixels = np.stack(np.where(instance_maps == instance))
 
@@ -140,12 +138,12 @@ class CustomCityscapes(Cityscapes):
 
             if pixels.shape[1] <= 64 * 64:
                 segmentation_weights[pixels[0], pixels[1]] = 3
-        
+
         segmentation_maps = np.expand_dims(np.array(segmentation_maps), 0)  # (H, W)
 
         # ADDED TO PREDICT REGRESSIONS BY CLASS:
         class_regressions = []
-        for class_i in range(config.n_classes + 1):
+        for class_i in range(config.n_classes):
             if class_i in class_list:
                 class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
                 class_i_mask = (segmentation_maps == class_i).astype(np.float32)
@@ -154,8 +152,7 @@ class CustomCityscapes(Cityscapes):
             else:
                 class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
         instance_regressions = np.stack(class_regressions)
-        
-        
+
         instance_regressions = np.concatenate((instance_regressions[1:], instance_regressions[:1]), 0)  # Changes from y-x to x-y
 
         instance_centers = np.expand_dims(center_map, 0)
@@ -163,6 +160,8 @@ class CustomCityscapes(Cityscapes):
         segmentation_weights = np.expand_dims(segmentation_weights, 0)
 
         image = self.to_tensor(image)
+
+        # segmentation_maps = np.expand_dims(np.array(segmentation_maps), 0)  # (H, W)
 
         if config.n_classes == 19:
             segmentation_maps[segmentation_maps == 255] = 0
