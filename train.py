@@ -1,11 +1,11 @@
-import config
+]import config
 import torch
 from torch.autograd.variable import Variable
 import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from deeplabv3 import Model, Model2, CapsuleModel, CapsuleModel2
+from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2
 import os
 from losses import MarginLoss
 
@@ -62,6 +62,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
             bsize = y_pred_regression.shape[0]
             y_pred_regression = torch.reshape(y_pred_regression, (bsize, config.n_classes, 2, config.h, config.w))
+            y_gt_regression = torch.reshape(y_gt_regression, (bsize, config.n_classes, 2, config.h, config.w))
             # print('y_gt_regression.shape:', y_gt_regression.shape)
             # print('reshaped y_pred_regression.shape:', y_pred_regression.shape)
             loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_reg_pres.unsqueeze(1)).mean() * config.regression_coef
@@ -104,7 +105,7 @@ def run_experiment():
         model = CapsuleModel('CapsuleModel', 'SimpleSegmentation/')
         criterion1 = MarginLoss(reduction='none', ignore_index=255)
     else:
-        model = Model2('Model2', 'SimpleSegmentation/')
+        model = Model3('Model3', 'SimpleSegmentation/')
         criterion1 = nn.CrossEntropyLoss(reduction='none', ignore_index=255)
 
     criterion2 = nn.MSELoss(reduction='mean')
