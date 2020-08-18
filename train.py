@@ -1,4 +1,4 @@
-]import config
+import config
 import torch
 from torch.autograd.variable import Variable
 import numpy as np
