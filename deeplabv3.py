@@ -406,6 +406,8 @@ class Model3(nn.Module): # gets regressions by class
         center = F.upsample(center, size=(h, w), mode="bilinear")
         
         regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
+        b_size = regressions.shape[0]
+        regressions = regressions.view(b_size, self.num_classes, 2, h, w)
         regressions[:, :, 0] = regressions[:, :, 0] * w
         regressions[:, :, 1] = regressions[:, :, 1] * h
 
