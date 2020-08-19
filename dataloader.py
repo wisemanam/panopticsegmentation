@@ -145,20 +145,25 @@ class CustomCityscapes(Cityscapes):
 
         # ADDED TO PREDICT REGRESSIONS BY CLASS:
         class_regressions = []
-        for class_i in range(config.n_classes):
+        class_present = []
+        for class_i in range(24, config.n_classes):
             if class_i in class_list:
-                class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
+                # class_i_pixels = np.stack(np.where(segmentation_maps == class_i)) # get location of instances belonging to class_i
                 class_i_mask = (segmentation_maps == class_i).astype(np.float32)
                 class_i_regressions = instance_regressions*class_i_mask # get regressions corresponding to class_i_pixels
                 class_regressions.append(np.array(class_i_regressions)) # append regression map
+                class_present.append(class_i_mask)
             else:
+                class_present.append(np.zeros((1, h, w)))
                 class_regressions.append(np.zeros((2, h, w))) # if class is not in image, append empty regression map
         instance_regressions = np.stack(class_regressions)
-        
+        instance_present = np.stack(class_present)
+
+        # print(instance_present.shape, flush=True)
         instance_regressions = np.concatenate((instance_regressions[:, 1:], instance_regressions[:, :1]), 1)  # Changes from y-x to x-y
 
         instance_centers = np.expand_dims(center_map, 0)
-        instance_present = np.expand_dims(regression_present, 0)
+        # instance_present = np.expand_dims(regression_present, 1)
         segmentation_weights = np.expand_dims(segmentation_weights, 0)
 
         image = self.to_tensor(image)
