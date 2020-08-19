@@ -210,6 +210,6 @@ class by_regression_inst_decoder(nn.Module):
 
         # Prediction:
         out = F.relu(self.conv_5x5_3(out))  # (shape: (batch_size, num_classes, h/4, w/4))
-        out = nn.Sigmoid(self.conv_1x1_4(out))  # (shape: (batch_size, 1, h/4, w/4))
+        out = self.conv_1x1_4(out)  # (shape: (batch_size, 1, h/4, w/4))
         
         return out
