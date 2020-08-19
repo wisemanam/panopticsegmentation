@@ -132,7 +132,7 @@ class by_regression_inst_decoder(nn.Module):
         self.conv_1x1_c = nn.Conv2d(32, 1, kernel_size=1)
 
         self.conv_5x5_r = nn.Conv2d(128, 32, kernel_size=5)
-        self.conv_1x1_r = nn.Conv2d(32, 2 * config.n_classes, kernel_size=1)
+        self.conv_1x1_r = nn.Conv2d(32, 2 * (config.n_classes - 24), kernel_size=1)
 
     def forward(self, feature_map, skip_8, skip_4):
         # (x has shape (batch_size, 256, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16.)
