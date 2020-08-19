@@ -51,7 +51,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
         y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # when using CapsuleModel2
 
-        loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
+        # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
+        loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef 
         
         loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
@@ -105,6 +106,7 @@ def run_experiment():
 
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
+    critereon4 = nn.BCELoss(reduction='none')
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
 
