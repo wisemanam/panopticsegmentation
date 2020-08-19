@@ -327,7 +327,7 @@ class CapsuleModel2(nn.Module):
                 linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
-                class_output = F.sigmoid(linear_class_capsules)
+                class_output = F.softmax(linear_class_capsules)
                 # print(class_output.shape)
                 
                 class_outs.append(class_output)
