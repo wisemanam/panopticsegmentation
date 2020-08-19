@@ -48,31 +48,18 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
                 param_group['lr'] = config.learning_rate * (1 - (iteration / config.n_iterations) ** 0.9)
 
         optimizer.zero_grad()
-        y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        # y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg)
-
-        # print(y_gt_reg_pres.shape, y_gt_reg_pres.max())
-        # print(y_pred_regression.shape, y_gt_regression.shape)
-        # print(y_pred_regression[:,2, 0].max(), y_pred_regression[:, 2, 0].min())
-        # print(y_pred_regression[:, 2, 1].max(), y_pred_regression[:, 2, 1].min(), flush=True)  
-        # exit()
-        
-
+        # y_pred_seg, y_pred_center, y_pred_regression = model(image)
+        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg)
 
         loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
         
-        #  loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
-        # for j in range(len(gt_class_list)):
-        #    if len(gt_class_list[j]) > 0:
-        #        loss += criterion1(pred_class_list[j], gt_class_list[j]).mean()
+        loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
+        for j in range(len(gt_class_list)):
+           if len(gt_class_list[j]) > 0:
+               loss += criterion1(pred_class_list[j], gt_class_list[j]).mean()
             
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
-            bsize = y_pred_regression.shape[0]
-            #y_pred_regression = torch.reshape(y_pred_regression, (bsize, config.n_classes, 2, config.h, config.w))
-            #y_gt_regression = torch.reshape(y_gt_regression, (bsize, config.n_classes, 2, config.h, config.w))
-            # print('y_gt_regression.shape:', y_gt_regression.shape)
-            # print('reshaped y_pred_regression.shape:', y_pred_regression.shape)
             loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_reg_pres).mean() * config.regression_coef
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
