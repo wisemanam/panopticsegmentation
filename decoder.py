@@ -163,7 +163,7 @@ class by_regression_inst_decoder(nn.Module):
 
         return out_center, out_regression
     
-    class seg_decoder2(nn.Module): # outputs single channel
+class seg_decoder2(nn.Module): # outputs single channel
     def __init__(self, in_feats, num_classes):
         super(seg_decoder2, self).__init__()
 
