@@ -49,7 +49,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
 
         optimizer.zero_grad()
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg)
+        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # when using CapsuleModel2
 
         loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
         
