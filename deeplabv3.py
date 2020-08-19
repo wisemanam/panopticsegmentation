@@ -254,7 +254,7 @@ class CapsuleModel2(nn.Module):
         self.segmentation_decoder = seg_decoder2(in_feats=in_feats, num_classes=self.num_classes)
         self.instance_decoder = inst_decoder(in_feats=in_feats)
         
-        self.linear = nn.Linear(272, self.num_classes)
+        self.linear = nn.Linear(1024, self.num_classes)
 
     def forward(self, x, point_lists, gt_seg=None):
         # (x has shape (batch_size, 3, h, w))
@@ -314,15 +314,18 @@ class CapsuleModel2(nn.Module):
                 # perform routing on inst capsules to get class capsules
                 inst_capsules = class_capsules[i, :, y_coords, x_coords]
                 pooled_inst_caps = torch.mean(inst_capsules, 0)
+
+                print('inst_capsules:',	inst_capsules.shape)
+       	       	print('pooled_inst_caps.shape:', pooled_inst_caps.shape)
+
                 linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
                 # class_output = F.sigmoid(linear_class_capsules)
                 class_output = F.softmax(linear_class_capsules, dim=-1)
-                # print(class_output.shape)
                 
                 class_outs.append(class_output)
-            # print(len(class_outs))
+
             class_outputs.append(torch.stack(class_outs) if len(class_outs) != 0 else [])
             # print(len(class_outputs[-1]))
 
