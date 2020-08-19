@@ -6,7 +6,7 @@ import os
 
 from resnet import ResNet18_OS16, ResNet34_OS16, ResNet50_OS16, ResNet101_OS16, ResNet152_OS16, ResNet18_OS8, ResNet34_OS8
 from aspp import ASPP, ASPP_Bottleneck
-from decoder import seg_decoder, inst_decoder, by_regression_inst_decoder
+from decoder import seg_decoder, inst_decoder, by_regression_inst_decoder, seg_decoder2
 from capsules import PrimaryCaps, ConvCaps, CapsulePooling
 
 
@@ -245,14 +245,14 @@ class CapsuleModel2(nn.Module):
         self.aspp = ASPP_Bottleneck()
 
         in_feats = 1280
-            
+  
         self.primary_caps = PrimaryCaps(in_feats, 32, (1, 1))
         self.caps_pooling = CapsulePooling((3,3), (1, 1), (1, 1))
 
         self.class_capsules = ConvCaps(32, 16, (1,1), padding=None)
             
-        self.segmentation_decoder = seg_decoder(in_feats=256, num_classes=self.num_classes)
-        self.instance_decoder = inst_decoder(in_feats=256)
+        self.segmentation_decoder = seg_decoder2(in_feats=in_feats, num_classes=self.num_classes)
+        self.instance_decoder = inst_decoder(in_feats=in_feats)
         
         self.linear = nn.Linear(272, self.num_classes)
 
@@ -283,7 +283,7 @@ class CapsuleModel2(nn.Module):
         # poses = poses.permute(0, 3, 1, 2).contiguous()
 
         class_capsules, poses = output, output   # we use the output of the aspp as our "capsules"
-        
+
         # Decoder for semantic segmentation:
         output = self.segmentation_decoder(poses, skip_8, skip_4)
         output = F.sigmoid(output)
@@ -307,26 +307,19 @@ class CapsuleModel2(nn.Module):
             for inst_points in point_list:
 
                 # gather capsules corresponding to inst_points
-                # print(inst_points)
-                # print(inst_points.shape, inst_points.dtype)
-                # inst_points = torch.Tensor(inst_points)
-                # print(inst_points.shape)
                 inst_points = torch.unique(inst_points//16, dim=1)
-                #print(inst_points.shape)
                  
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
-                # inst_capsules = class_capsules[i, y_coords, x_coords, :]
 
                 # perform routing on inst capsules to get class capsules
-                # pooled_inst_caps = torch.mean(inst_capsules, 0)
-                # linear_class_capsules = self.linear(pooled_inst_caps)
+                inst_capsules = class_capsules[i, :, y_coords, x_coords]
+                pooled_inst_caps = torch.mean(inst_capsules, 0)
+                linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
                 # class_output = F.sigmoid(linear_class_capsules)
-                # print(class_output.shape)
-                
-                inst_capsules = class_capsules[i, :, y_coords, x_coords]
                 class_output = F.softmax(linear_class_capsules, dim=-1)
+                # print(class_output.shape)
                 
                 class_outs.append(class_output)
             # print(len(class_outs))
