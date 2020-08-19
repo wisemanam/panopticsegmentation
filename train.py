@@ -97,7 +97,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
 
 def run_experiment():
     if config.model == 'CapsuleModel':
-        model = CapsuleModel('CapsuleModel', 'SimpleSegmentation/')
+        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
         criterion1 = MarginLoss(reduction='none', ignore_index=255)
     else:
         model = Model3('Model3', 'SimpleSegmentation/')
