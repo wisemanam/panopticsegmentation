@@ -268,22 +268,25 @@ class CapsuleModel2(nn.Module):
         output = self.aspp(feature_map)  # (shape: (batch_size, 256, h/16, w/16))
         # print('output should be shape (8, 256, 32, 64):', output.shape)
 
-        primary_capsules = self.primary_caps(output)  # (batch_size, h/16, w/16, 32*(4*4+1))
+        # primary_capsules = self.primary_caps(output)  # (batch_size, h/16, w/16, 32*(4*4+1))
         # print('primary_capsules should be shape (8, 32, 64, 544):', primary_capsules.shape)
 
-        primary_capsules_pooled = self.caps_pooling(primary_capsules)
+        # primary_capsules_pooled = self.caps_pooling(primary_capsules)
 
-        class_capsules = self.class_capsules(primary_capsules_pooled)  # (batch_size, h/16, w/16, C*(4*4+1))
+        # class_capsules = self.class_capsules(primary_capsules_pooled)  # (batch_size, h/16, w/16, C*(4*4+1))
 
-        b, h_down, w_down, _ = class_capsules.shape
-        c = 16
-        p = 4
+        # b, h_down, w_down, _ = class_capsules.shape
+        # c = 16
+        # p = 4
 
-        poses, activations = class_capsules[..., :c*p*p], class_capsules[..., c*p*p:]  # Shapes (batch_size, h/16, w/16, C*4*4) and (batch_size, h/16, w/16, C)
-        poses = poses.permute(0, 3, 1, 2).contiguous()
+        # poses, activations = class_capsules[..., :c*p*p], class_capsules[..., c*p*p:]  # Shapes (batch_size, h/16, w/16, C*4*4) and (batch_size, h/16, w/16, C)
+        # poses = poses.permute(0, 3, 1, 2).contiguous()
 
+        class_capsules, poses = output, output   # we use the output of the aspp as our "capsules"
+        
         # Decoder for semantic segmentation:
         output = self.segmentation_decoder(poses, skip_8, skip_4)
+        output = F.sigmoid(output)
 
         # Decoder for instance segmentation:
         center, regressions = self.instance_decoder(poses, skip_8, skip_4)
