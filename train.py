@@ -16,7 +16,7 @@ def get_accuracy(y_pred, y):
     return torch.mean((y_argmax.long() == y.long()).type(torch.float))
 
 
-def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, iteration):
+def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, optimizer, iteration):
     model.train()
 
     if config.use_cuda:
@@ -49,15 +49,18 @@ def train(model, data_loader, criterion1, criterion2, criterion3, optimizer, ite
 
         optimizer.zero_grad()
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # when using CapsuleModel2
+        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
 
         # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
-        loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef 
+
+        # print('y_pred_seg.shape:', y_pred_seg.shape)
+        # print('y_gt_seg.squeeze(1).shape:', y_gt_seg.squeeze(1).shape)
+        loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef
         
-        loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
+        # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
-           if len(gt_class_list[j]) > 0:
-               loss += criterion1(pred_class_list[j], gt_class_list[j]).mean()
+          if len(gt_class_list[j]) > 0:
+              loss += criterion1(pred_class_list[j], gt_class_list[j]).mean()
             
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
@@ -106,7 +109,7 @@ def run_experiment():
 
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
-    critereon4 = nn.BCELoss(reduction='none')
+    criterion4 = nn.BCELoss(reduction='none')
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
 
@@ -125,7 +128,7 @@ def run_experiment():
     while iteration < config.n_iterations:
         tr_dataloader = DataLoader(tr_dataset, batch_size=config.batch_size, shuffle=True, num_workers=config.num_workers, collate_fn=custom_collate)
 
-        losses, _, iteration = train(model, tr_dataloader, criterion1, criterion2, criterion3, optimizer, iteration)
+        losses, _, iteration = train(model, tr_dataloader, criterion1, criterion2, criterion3, criterion4, optimizer, iteration)
 
     print('Training Finished')
 
