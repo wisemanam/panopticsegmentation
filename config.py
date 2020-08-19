@@ -12,7 +12,7 @@ batch_size = 8
 
 n_classes = 34
 
-model = 'Model'  # 'CapsuleModel'
+model = 'CapsuleModel'  # 'CapsuleModel'
 
 model_id = 3
 save_dir = './SavedModels/Run%d/' % model_id
@@ -28,7 +28,7 @@ data_dir = './CityscapesData'
 num_workers = 8
 
 seg_coef = 1.0
-center_coef = 1.0
+center_coef = 0
 regression_coef = 0.01
 
 h, w = 512, 1024
