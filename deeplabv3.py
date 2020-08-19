@@ -315,20 +315,18 @@ class CapsuleModel2(nn.Module):
                 #print(inst_points.shape)
                  
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
-                # y_coords = torch.tensor([y//16 for y in y_coords])
-                # x_coords = torch.tensor([x//16 for x in x_coords])
-                #print(y_coords.min(), y_coords.max())
-                #print(x_coords.min(), x_coords.max())
-                #print(class_capsules.shape)
-                inst_capsules = class_capsules[i, y_coords, x_coords, :]
+                # inst_capsules = class_capsules[i, y_coords, x_coords, :]
 
                 # perform routing on inst capsules to get class capsules
-                pooled_inst_caps = torch.mean(inst_capsules, 0)
-                linear_class_capsules = self.linear(pooled_inst_caps)
+                # pooled_inst_caps = torch.mean(inst_capsules, 0)
+                # linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
-                class_output = F.softmax(linear_class_capsules)
+                # class_output = F.sigmoid(linear_class_capsules)
                 # print(class_output.shape)
+                
+                inst_capsules = class_capsules[i, :, y_coords, x_coords]
+                class_output = F.softmax(linear_class_capsules, dim=-1)
                 
                 class_outs.append(class_output)
             # print(len(class_outs))
