@@ -266,10 +266,8 @@ class CapsuleModel2(nn.Module):
 
         # Capsules
         output = self.aspp(feature_map)  # (shape: (batch_size, 256, h/16, w/16))
-        # print('output should be shape (8, 256, 32, 64):', output.shape)
 
         # primary_capsules = self.primary_caps(output)  # (batch_size, h/16, w/16, 32*(4*4+1))
-        # print('primary_capsules should be shape (8, 32, 64, 544):', primary_capsules.shape)
 
         # primary_capsules_pooled = self.caps_pooling(primary_capsules)
 
@@ -302,7 +300,7 @@ class CapsuleModel2(nn.Module):
 
         class_outputs = []
         for i, point_list in enumerate(point_lists):
-            # print(len(point_list))
+            
             class_outs = []
             for inst_points in point_list:
 
@@ -315,9 +313,6 @@ class CapsuleModel2(nn.Module):
                 inst_capsules = class_capsules[i, :, y_coords, x_coords]
                 pooled_inst_caps = torch.mean(inst_capsules, 1)
 
-                #print('inst_capsules:', inst_capsules.shape)
-       	       	#print('pooled_inst_caps.shape:', pooled_inst_caps.shape)
-
                 linear_class_capsules = self.linear(pooled_inst_caps)
 
                 # get activations from the class capsules
@@ -327,7 +322,6 @@ class CapsuleModel2(nn.Module):
                 class_outs.append(class_output)
 
             class_outputs.append(torch.stack(class_outs) if len(class_outs) != 0 else [])
-            # print(len(class_outputs[-1]))
 
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
