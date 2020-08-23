@@ -9,7 +9,6 @@ from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2
 from PIL import Image
 
-
 def mkdir(dir_name):
     if os.path.isdir(dir_name):
         return
@@ -38,32 +37,19 @@ class Converter(nn.Module):
         eval_preds[:, _CITYSCAPES_TRAIN_ID_TO_EVAL_ID] = prediction
 
         return eval_preds
-
-def get_points(instance_maps):
-    # instance_maps is a list of N (h, w) tensors, N being the number of instances in the image
-    point_lists = []
-    for i, inst_map in enumerate(instance_maps):
-        point_list = []
-        unique_insts = torch.unique(inst_map)
-        inst_map = inst_map.cpu()
-        for inst in unique_insts:
-            pixels = np.stack(np.where(inst_map == inst))
-            point_list.append(torch.Tensor(pixels).long())
-        point_lists.append(point_list)
-    return point_lists
+        
 
 def inference(model, data_loader):
     model.eval()
-    post = PostProcessing4(dims=(config.h, config.w), kernel_size=7, top_k=200, circle_radius=7)
     convert_to_eval = Converter(dims=(config.h, config.w))
 
     if config.use_cuda:
         model.cuda()
-        post.cuda()
         convert_to_eval.cuda()
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), gt_class_list, gt_point_list, name = sample
+        # image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), name = sample
+        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
 
         if config.use_cuda:
             image = image.cuda()
@@ -71,45 +57,35 @@ def inference(model, data_loader):
             y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
-            gt_class_list = [i.cuda() if len(i) != 0 else [] for i in gt_class_list]
 
         with torch.no_grad():
-            # y_pred_seg, y_pred_center, y_pred_regression = model(image)
-            y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg)
+            y_pred_fg_seg, y_pred_center, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None)
 
-            if config.n_classes == 19:
-                y_pred_seg = convert_to_eval(y_pred_seg)
+            # if config.n_classes == 19:  # TODO implement the class conversion later
+            #     y_pred_class = convert_to_eval(y_pred_class)
 
-            instance_map_outputs, y_pred_seg_argmax, instance_maps = post(y_pred_seg, y_pred_center, y_pred_regression, y_gt_seg.float())
-            
-            points = get_points(instance_maps)
-
-            y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, points, y_gt_seg)
-
-        y_pred_seg_argmax = y_pred_seg_argmax.data.cpu().numpy()
-
-        for j in range(len(y_pred_seg_argmax)):
-            img_name_split = name[j].split('/')
+        for j in range(len(y_pred_fg_seg)):
+            img_name_split = img_name[j].split('/')
             city = img_name_split[-2]
-            mkdir('./SavedImages/val/Pixel/' + city)
-
-            img_name = './SavedImages/val/Pixel/' + city + '/' + img_name_split[-1].replace('leftImg8bit', 'predFine_labelids')
-
-            img = Image.fromarray(y_pred_seg_argmax[j].astype(np.uint8), mode='P')  # Converts numpy array to PIL Image
-            img = img.resize(size=(2048, 1024), resample=Image.NEAREST)  # Resizes image
-            img.save(img_name, "PNG", mode='P')  # Saves image
 
             mkdir('./SavedImages/val/Instance/' + city)
             inst_dir_name = './SavedImages/val/Instance/' + city + '/' + img_name_split[-1].replace('leftImg8bit', '')[:-5] + '/'
             mkdir(inst_dir_name)
 
-            instance_map_output = instance_map_outputs[j]
+            class_probs = y_pred_class[j]  # Shape (N, C)
+
+            class_probs = class_probs.cpu()
+
+            class_preds = np.argmax(class_probs, -1)
+            segmentation_list = segmentation_lists[j]  # length N
 
             lines = []
-            
-            for inst, (binary_map, inst_class, inst_prob, seg_prob, n_pixels) in enumerate(instance_map_output):
-                if n_pixels <= 0:
-                    continue
+            for inst in range(len(class_probs)):
+                binary_map = segmentation_list[inst]
+                inst_class = class_preds[inst]
+                inst_prob = 1.0
+                seg_prob = class_probs[inst, inst_class]
+
                 binary_map = binary_map.data.cpu().numpy()
 
                 img = Image.fromarray(binary_map, mode='L')  # Converts numpy array to PIL Image
@@ -141,11 +117,8 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    # model_45_0.4305.pth  model_60_0.4552.pth model_50_20.2748.pth
+    iteration = 46000
 
-    iteration = 60000
-
-    # model_10_1.2785.pth
     if config.model == 'CapsuleModel':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
     else:
