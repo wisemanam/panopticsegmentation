@@ -5,7 +5,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2
+from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2, CapsuleModel3
 import os
 from losses import MarginLoss
 
@@ -49,7 +49,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         optimizer.zero_grad()
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
+        # y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
+        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_seg)
 
         # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
 
@@ -100,8 +101,11 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
 
 def run_experiment():
-    if config.model == 'CapsuleModel':
-        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
+    if config.model == 'CapsuleModel2':
+        model = CapsuleModel3('CapsuleModel2', 'SimpleSegmentation/')
+        criterion1 = nn.CrossEntropyLoss(reduction='none', ignore_index=255)
+    elif config.model == 'CapsuleModel3':
+        model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
         criterion1 = nn.CrossEntropyLoss(reduction='none', ignore_index=255)
     else:
         model = Model3('Model3', 'SimpleSegmentation/')
