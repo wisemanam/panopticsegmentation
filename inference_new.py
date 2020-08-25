@@ -1,3 +1,4 @@
+
 from postprocessing import PostProcessing, PostProcessing2, PostProcessing3
 from postprocessing4 import PostProcessing4
 import config
@@ -6,7 +7,7 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2
+from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2, CapsuleModel3
 from PIL import Image
 
 def mkdir(dir_name):
@@ -48,7 +49,6 @@ def inference(model, data_loader):
         convert_to_eval.cuda()
 
     for i, sample in enumerate(data_loader):
-        # image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), name = sample
         image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
 
         if config.use_cuda:
@@ -64,6 +64,7 @@ def inference(model, data_loader):
             # if config.n_classes == 19:  # TODO implement the class conversion later
             #     y_pred_class = convert_to_eval(y_pred_class)
 
+
         for j in range(len(y_pred_fg_seg)):
             img_name_split = img_name[j].split('/')
             city = img_name_split[-2]
@@ -73,11 +74,13 @@ def inference(model, data_loader):
             mkdir(inst_dir_name)
 
             class_probs = y_pred_class[j]  # Shape (N, C)
+            
+            if len(class_probs) != 0:
+                class_probs = class_probs.cpu()
 
-            class_probs = class_probs.cpu()
+                class_preds = np.argmax(class_probs, -1)
 
-            class_preds = np.argmax(class_probs, -1)
-            segmentation_list = segmentation_lists[j]  # length N
+                segmentation_list = segmentation_lists[j]  # length N
 
             lines = []
             for inst in range(len(class_probs)):
@@ -117,10 +120,12 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 46000
+    iteration = 20000
 
-    if config.model == 'CapsuleModel':
+    if config.model == 'CapsuleModel2':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel3':
+        model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
     else:
         model = Model2('Model', 'SimpleSegmentation/')
 
