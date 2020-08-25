@@ -8,7 +8,7 @@ import torch.optim as optim
 from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2, CapsuleModel3
 import os
 from losses import MarginLoss
-
+from focal import FocalLoss
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.argmax(y_pred, 1)
@@ -54,8 +54,6 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
 
-        # print('y_pred_seg.shape:', y_pred_seg.shape)
-        # print('y_gt_seg.squeeze(1).shape:', y_gt_seg.squeeze(1).shape)
         loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef
         
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
@@ -113,7 +111,8 @@ def run_experiment():
 
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
-    criterion4 = nn.BCELoss(reduction='none')
+    # criterion4 = nn.BCELoss(reduction='none')
+    criterion4 = FocalLoss(alpha=0.25, gamma=2)
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
 
