@@ -403,13 +403,17 @@ class CapsuleModel3(nn.Module):
 
                 # perform routing on inst capsules to get class capsules
                 inst_capsules = class_capsules[i, :, y_coords, x_coords]
+                # print('inst_capsules:', inst_capsules.shape)
                 inst_capsules = torch.transpose(inst_capsules, 0, 1)
+                #print('inst_capsules:', inst_capsules.shape)
                 linear_class_capsules = self.linear(inst_capsules)
+                #print('linear_class_capsules:', linear_class_capsules.shape)
                 linear_class_capsules = torch.mean(linear_class_capsules, 0)
-
+                #print('linear_class_capsules:', linear_class_capsules.shape)
 
                 # get activations from the class capsules
                 class_output = F.softmax(linear_class_capsules, dim=-1)
+                # print('class_output:', class_output.shape)
 
                 class_outs.append(class_output)
 
