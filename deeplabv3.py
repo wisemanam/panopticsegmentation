@@ -459,10 +459,10 @@ class CapsuleModel4(nn.Module):
 
         self.hough_routing = HoughRouting1()
         
-        self.attention = nn.MultiheadAttention(256, 8)
-        self.linear_key = nn.Linear(in_feats, 256)
-        self.linear_query = nn.Linear(in_feats, 256)
-        self.linear_value = nn.Linear(in_feats, 256)
+        self.attention = nn.MultiheadAttention(embed_dim=256, num_heads=8)
+        self.conv1x1_key = nn.Conv2d(in_feats, 256, 1)
+        self.conv1x1_query = nn.Conv2d(in_feats, 256, 1)
+        self.conv1x1_value = nn.Conv2d(in_feats, 256, 1)
 
     def forward(self, x, point_lists=None, gt_seg=None):
         # (x has shape (batch_size, 3, h, w))
@@ -482,9 +482,9 @@ class CapsuleModel4(nn.Module):
         output = F.sigmoid(output)
         class_capsule_activations = output
 
-        class_capsules_key = self.linear_key(class_capsules)
-        class_capsules_query = self.linear_query(class_capsules)
-        class_capsules_value = self.linear_value(class_capsules)
+        class_capsules_key = self.conv1x1_key(class_capsules)
+        class_capsules_query = self.conv1x1_query(class_capsules)
+        class_capsules_value = self.conv1x1_value(class_capsules)
         
         # Decoder for instance segmentation:
         center, regressions = self.instance_decoder(poses, skip_8, skip_4)
@@ -513,32 +513,27 @@ class CapsuleModel4(nn.Module):
 
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
 
-                # perform routing on inst capsules to get class capsules
-                # inst_capsules = class_capsules[i, :, y_coords, x_coords]
-                
-                # inst_capsules = torch.transpose(inst_capsules, 0, 1)
-                inst_capsules_activations = class_capsules_activations[i, 0, y_coords, x_coords] #shape (p, )
+                inst_capsules_activations = class_capsule_activations[i, 0, y_coords, x_coords] #shape (p, )
                 argsort_activations = torch.argsort(inst_capsules_activations, descending=True)[:1000]
-                # topk_capsules = inst_capsules[argsort_activations] # (1000, num_channels)
+
                 
                 y_coords_topk = y_coords[argsort_activations]
                 x_coords_topk = x_coords[argsort_activations]
                 
+
                 instance_capsules_key  = class_capsules_key[i, :, y_coords_topk, x_coords_topk]
-                instance_capsules_query = class_capsules_query[i, :, y_coords_topk, x_coords_topk]
-                instance_capsules_value = class_capsules_value[i, :, y_coords_topk, x_coords_topk]
+                # instance_capsules_query = class_capsules_query[i, :, y_coords_topk, x_coords_topk]
+                # instance_capsules_value = class_capsules_value[i, :, y_coords_topk, x_coords_topk]
                 
                 instance_capsules_key = torch.transpose(instance_capsules_key, 0, 1).unsqueeze(1)
-                instance_capsules_query = torch.transpose(instance_capsules_query, 0, 1).unsqueeze(1)
-                instance_capsules_value = torch.transpose(instance_capsules_value, 0, 1).unsqueeze(1) # (p, 1, 256)
+                # instance_capsules_query = torch.transpose(instance_capsules_query, 0, 1).unsqueeze(1)
+                # instance_capsules_value = torch.transpose(instance_capsules_value, 0, 1).unsqueeze(1) # (p, 1, 256)
                 
-                inst_capsules, _ = self.attention(instance_capsules_query, instance_capsules_key, instance_capsules_value) # (p, 1, 256)
-                inst_capsules = inst_capsules.squeeze(1) # (p, 256)
-                
-                linear_class_capsules = self.linear(inst_capsules)
-                #print('linear_class_capsules:', linear_class_capsules.shape)
+                # inst_capsules, _ = self.attention(instance_capsules_query, instance_capsules_key, instance_capsules_value) # (p, 1, 256)
+                # inst_capsules = inst_capsules.squeeze(1) # (p, 256)
+                #print(inst_capsules.shape)
+                linear_class_capsules = self.linear(instance_capsules_key.squeeze(1))
                 linear_class_capsules = torch.mean(linear_class_capsules, 0)
-                #print('linear_class_capsules:', linear_class_capsules.shape)
 
                 # get activations from the class capsules
                 class_output = F.softmax(linear_class_capsules, dim=-1)
