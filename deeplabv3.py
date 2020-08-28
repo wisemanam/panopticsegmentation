@@ -514,7 +514,7 @@ class CapsuleModel4(nn.Module):
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
 
                 inst_capsules_activations = class_capsule_activations[i, 0, y_coords, x_coords] #shape (p, )
-                argsort_activations = torch.argsort(inst_capsules_activations, descending=True)[:1000]
+                argsort_activations = torch.argsort(inst_capsules_activations, descending=True)[:1000000]
 
                 
                 y_coords_topk = y_coords[argsort_activations]
