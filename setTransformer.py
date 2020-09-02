@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-
+from math import sqrt
 
 def qkv_attention(queries, keys, values, presence):
     """
@@ -19,7 +19,7 @@ def qkv_attention(queries, keys, values, presence):
         presence = presence.unsqueeze(0)
         qk -= (1.0-presence)*1e32
 
-    qk = torch.softmax(qk/torch.sqrt(n_dims), -1)  # (N_j, N_i)
+    qk = torch.softmax(qk/sqrt(n_dims), -1)  # (N_j, N_i)
 
     return torch.matmul(qk, values)  # (N_j, F)
 
@@ -64,43 +64,15 @@ class MultiHeadQKVAttention(nn.Module):
         return self.linear_out(heads)  # (N_j, F_2)
 
 
-class SetTransformer(nn.Module):
-    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=1):
-        super(SetTransformer, self).__init__()
-
-        self.n_heads = n_heads
-
-        self.vote_transform = nn.Linear(n_feats_in, hidden_dim)
-
-        self.inducing_points = nn.Parameter(torch.zeros(n_caps_out, hidden_dim))
-        self.inducing_points.data.normal_(0, 0.5)  # Randomly initializes weights
-
-        self.multihead_qkv_att = MultiHeadQKVAttention(hidden_dim, self.n_heads)
-
-    def forward(self, capsule_poses, capsule_acts):
-        """
-
-        :param capsule_poses: Shape (N_i, F_in)
-        :param capsule_acts: Shape (N_i, )
-        :return: Shape (N_j, F_out)
-        """
-
-        # TODO include self attention before qkv attention
-        # TODO add functionality for different capsule types, i.e. (C_i, N_i, F_in)
-
-        votes = self.vote_transform(capsule_poses)
-
-        return self.multihead_qkv_att(self.inducing_points, votes, votes, capsule_acts)
-
-
 class TransformerRouting(nn.Module):
-    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=1, output_dim=16):
+    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=1, output_dim=32):
         super(TransformerRouting, self).__init__()
 
         assert hidden_dim % n_heads == 0
 
         self.hidden_dim = hidden_dim
         self.n_heads = n_heads
+        self.split_size = hidden_dim // n_heads
         self.output_dim = output_dim
 
         self.vote_transform = nn.Linear(n_feats_in, hidden_dim)
@@ -125,15 +97,16 @@ class TransformerRouting(nn.Module):
         # TODO add functionality for different capsule types, i.e. (C_i, N_i, F_in)
         # This would require inputting the votes, and removing this first vote transform
 
+        # capsule_poses = torch.transpose(capsule_poses, 0, 1)
         votes = self.vote_transform(capsule_poses)  # (N_i, F)
 
         q_tr = self.linear_q(self.inducing_points)  # (N_j, F)
         k_tr = self.linear_k(votes)
         v_tr = self.linear_v(votes)  # (N_i, F) - these are the votes
 
-        q_splits = torch.split(q_tr, self.n_heads, -1)
-        k_splits = torch.split(k_tr, self.n_heads, -1)
-        v_splits = torch.split(v_tr, self.n_heads, -1)
+        q_splits = torch.split(q_tr, self.split_size, -1)
+        k_splits = torch.split(k_tr, self.split_size, -1)
+        v_splits = torch.split(v_tr, self.split_size, -1)
 
         heads = []
         for i in range(self.n_heads):
@@ -151,7 +124,7 @@ class TransformerRouting(nn.Module):
 
         cost_per_dim = torch.sum(diff*acts_res, 1) / (sum_acts + 1e-8)  # (N_j, F)
 
-        total_cost = torch.sum(cost_per_dim, 1) / torch.sqrt(cost_per_dim.shape[-1])  # (N_j, )
+        total_cost = torch.sum(cost_per_dim, 1) / (cost_per_dim.shape[-1]**0.5 + 1e-7)  # (N_j, )
 
         # Ideally, low cost -> high activation
         lmda = 1
