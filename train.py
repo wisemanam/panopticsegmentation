@@ -65,6 +65,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         for j in range(len(gt_class_list)):
           if len(gt_class_list[j]) > 0:
               gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
+              print(pred_class_list[j])
               loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               loss_list.append(criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef)        
     
