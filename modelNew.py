@@ -92,10 +92,11 @@ class CapsuleModelNew1(nn.Module):
 
                 inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (p, 256)
                 inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1)
+                
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
-                inst_capsule_poses[:, -1] += x_coords.cuda()
-                inst_capsule_poses[:, -2] += y_coords.cuda()
+                # inst_capsule_poses[:, -1] += x_coords.cuda()
+                # inst_capsule_poses[:, -2] += y_coords.cuda()
 
                 inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
 
