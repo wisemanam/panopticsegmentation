@@ -64,8 +64,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
           if len(gt_class_list[j]) > 0:
-              gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               print(pred_class_list[j])
+              gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               loss_list.append(criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef)        
     
