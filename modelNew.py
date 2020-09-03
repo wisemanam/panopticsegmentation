@@ -67,12 +67,13 @@ class CapsuleModelNew1(nn.Module):
 
         # creates the first capsule layer
         capsule_poses = self.conv1x1_poses(feature_output)  # (batch_size, 256, h/16, w/16)
-        capsule_acts = self.conv1x1_acts(feature_output)   # (batch_size, 1, h/16, w/16)
+        capsule_acts_logits = self.conv1x1_acts(feature_output)   # (batch_size, 1, h/16, w/16)
         
 
         if self.training:
-            capsule_acts += ((torch.rand(*capsule_acts.shape) - 0.5) * self.noise_scale).cuda()  # adds noise to force network to learn binary activations
-        capsule_acts = F.sigmoid(capsule_acts)
+            # capsule_acts1 = capsule_acts_logits + 100
+            capsule_acts_logits += ((torch.rand(*capsule_acts_logits.shape) - 0.5) * self.noise_scale).cuda()  # adds noise to force network to learn binary activations
+        capsule_acts = F.sigmoid(capsule_acts_logits)
 
         if point_lists is None:
             inst_maps, point_lists, segmentation_lists = self.hough_routing(fg_pred, regressions, gt_seg)
@@ -92,13 +93,19 @@ class CapsuleModelNew1(nn.Module):
 
                 inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (p, 256)
                 inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1)
-                
+
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
                 # inst_capsule_poses[:, -1] += x_coords.cuda()
                 # inst_capsule_poses[:, -2] += y_coords.cuda()
 
                 inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
+                #inst_capsule_acts1 = capsule_acts1[i, 0, y_coords, x_coords]    # (p, )
+                #inst_capsule_acts_logits = capsule_acts_logits[i, 0, y_coords, x_coords]    # (p, )
+
+                # print('inst_capsule_acts:', inst_capsule_acts)
+                #print('inst_capsule_acts1:', inst_capsule_acts1)
+                # print('inst_capsule_acts_logits:', inst_capsule_acts_logits)
 
                 out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
 
@@ -108,7 +115,7 @@ class CapsuleModelNew1(nn.Module):
 
                 # get activations from the class capsules
                 class_output = F.softmax(linear_class_capsules, dim=-1)
-                # print('class_output:', class_output)
+                  
 
                 class_outs.append(class_output)
 
