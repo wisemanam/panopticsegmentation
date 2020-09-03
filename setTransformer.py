@@ -65,7 +65,7 @@ class MultiHeadQKVAttention(nn.Module):
 
 
 class TransformerRouting(nn.Module):
-    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=1, output_dim=32):
+    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=8, output_dim=128):
         super(TransformerRouting, self).__init__()
 
         assert hidden_dim % n_heads == 0
@@ -97,7 +97,6 @@ class TransformerRouting(nn.Module):
         # TODO add functionality for different capsule types, i.e. (C_i, N_i, F_in)
         # This would require inputting the votes, and removing this first vote transform
 
-        # capsule_poses = torch.transpose(capsule_poses, 0, 1)
         votes = self.vote_transform(capsule_poses)  # (N_i, F)
 
         q_tr = self.linear_q(self.inducing_points)  # (N_j, F)
@@ -110,7 +109,7 @@ class TransformerRouting(nn.Module):
 
         heads = []
         for i in range(self.n_heads):
-            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], capsule_acts))
+            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], capsule_acts.round()))
         pred_poses = torch.cat(heads, -1)  # (N_j, F)
 
         out_poses_res = pred_poses.unsqueeze(1)  # (N_j, 1, F)
