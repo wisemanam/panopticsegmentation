@@ -104,7 +104,7 @@ class CapsuleModelNew1(nn.Module):
                 #inst_capsule_acts_logits = capsule_acts_logits[i, 0, y_coords, x_coords]    # (p, )
 
                 # print('inst_capsule_acts:', inst_capsule_acts)
-                #print('inst_capsule_acts1:', inst_capsule_acts1)
+                # print('inst_capsule_acts1:', inst_capsule_acts1)
                 # print('inst_capsule_acts_logits:', inst_capsule_acts_logits)
 
                 out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
