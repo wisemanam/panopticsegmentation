@@ -54,7 +54,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
         # y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
-        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_seg)
+        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_reg_pres)
 
         # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
 
@@ -64,7 +64,6 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
           if len(gt_class_list[j]) > 0:
-              print(pred_class_list[j])
               gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               loss_list.append(criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef)        
