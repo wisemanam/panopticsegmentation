@@ -92,28 +92,28 @@ class CapsuleModelNew1(nn.Module):
 
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
 
-                inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (p, 256)
-                inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1) # (256, p)
-                
-                inst_capsule_poses = torch.mean(inst_capsule_poses, 1)
-                inst_capsule_poses = self.linear_poses(inst_capsule_poses)
+                inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (256, p)
+                inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1) # (p, 256)
 
+                inst_capsule_poses = self.linear_poses(inst_capsule_poses) # (p, 34)
+                inst_capsule_poses = torch.mean(inst_capsule_poses, 0) # (34,)
+ 
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
                 # inst_capsule_poses[:, -1] += x_coords.cuda()
                 # inst_capsule_poses[:, -2] += y_coords.cuda()
 
-                inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
-                
-                out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
+                # inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
+
+                # out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, ) 
 
                 # TODO test if the out_capsule_acts work as intended instead of using following linear layer
 
-                linear_class_capsules = self.linear(out_capsule_poses)[:, 0]  # (34, )
+                # linear_class_capsules = self.linear(out_capsule_poses)[:, 0]  # (34, )
 
                 # get activations from the class capsules
-                class_output = F.softmax(linear_class_capsules, dim=-1)
-                  
+                # class_output = F.softmax(linear_class_capsules, dim=-1)
+                class_output = F.softmax(inst_capsule_poses, dim=-1)
 
                 class_outs.append(class_output)
 
