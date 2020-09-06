@@ -94,7 +94,8 @@ class CapsuleModelNew1(nn.Module):
                 inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (p, 256)
                 inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1) # (256, p)
                 
-                
+                #average inst capsule poses 
+                #linear layer with 34 outputs
 
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
