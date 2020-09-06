@@ -38,6 +38,7 @@ class CapsuleModelNew1(nn.Module):
         self.transformer_routing = TransformerRouting(n_feats_in=256, n_caps_out=self.num_classes, output_dim=16)
 
         self.linear = nn.Linear(16, 1)
+        self.linear_poses = nn.Linear(256, 34)
 
     def forward(self, x, point_lists=None, gt_seg=None):
         # (x has shape (batch_size, 3, h, w))
@@ -94,8 +95,8 @@ class CapsuleModelNew1(nn.Module):
                 inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (p, 256)
                 inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1) # (256, p)
                 
-                #average inst capsule poses 
-                #linear layer with 34 outputs
+                inst_capsule_poses = torch.mean(inst_capsule_poses, 1)
+                inst_capsule_poses = self.linear_poses(inst_capsule_poses)
 
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
