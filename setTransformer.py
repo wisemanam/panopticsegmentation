@@ -109,7 +109,7 @@ class TransformerRouting(nn.Module):
 
         heads = []
         for i in range(self.n_heads):
-            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], capsule_acts.round()))
+            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], None))
         pred_poses = torch.cat(heads, -1)  # (N_j, F)
 
         out_poses_res = pred_poses.unsqueeze(1)  # (N_j, 1, F)
