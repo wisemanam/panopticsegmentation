@@ -96,12 +96,12 @@ class CapsuleModelNew1(nn.Module):
  
                 # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
-                # inst_capsule_poses[:, -1] += x_coords.cuda()
-                # inst_capsule_poses[:, -2] += y_coords.cuda()
+                inst_capsule_poses[:, -1] += x_coords.cuda()
+                inst_capsule_poses[:, -2] += y_coords.cuda()
 
                 inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
 
-                out_capsule_poses, out_capsule_acts = self.transformer_routing1(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
+                out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
 
                 # TODO test if the out_capsule_acts work as intended instead of using following linear layer
 
