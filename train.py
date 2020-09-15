@@ -7,7 +7,7 @@ from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
 from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2, CapsuleModel3, CapsuleModel4
-from modelNew import CapsuleModelNew1
+from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
 import os
 from losses import MarginLoss
 from focal import FocalLoss
@@ -51,7 +51,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         optimizer.zero_grad()
         loss_list = []
-
+        classification_loss = 0
         # y_pred_seg, y_pred_center, y_pred_regression = model(image)
         # y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
         y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_reg_pres)
@@ -66,6 +66,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
           if len(gt_class_list[j]) > 0:
               gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+              classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               loss_list.append(criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef)        
     
         if config.use_instance:
@@ -85,6 +86,7 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         if (i + 1) % 10 == 0:
             print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i + 1, float(np.mean(losses)), float(np.mean(accs))), flush=True)
             # print('loss_list:', loss_list)
+            # print(classification_loss)
 
         if iteration % config.save_every_n_iters == 0:
             print('Model Saving.')
@@ -111,8 +113,8 @@ def run_experiment():
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel3':
-        model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModelNewLayers':
+        model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     elif config.model == 'CapsuleModel4':
         model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
