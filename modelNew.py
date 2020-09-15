@@ -99,6 +99,12 @@ class CapsuleModelNew1(nn.Module):
                 # inst_capsule_poses[:, -1] += x_coords.cuda()
                 # inst_capsule_poses[:, -2] += y_coords.cuda()
 
+                inst_points_mean = torch.mean(inst_points.float(), 0, keepdim=True)
+                inst_points_rel =  inst_points - inst_points_mean   # gets the relative coordinates
+                y_coords_rel, x_coords_rel = inst_points_rel[0, :], inst_points_rel[1, :]
+                y_coords_rel, x_coords_rel = y_coords_rel / float(h/16), x_coords_rel / float(w/16)   # Performs normalization between 0 and 1
+
+
                 inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
 
                 out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
