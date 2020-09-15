@@ -7,7 +7,8 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2, CapsuleModel3
+from deeplabv3 import Model, CapsuleModel, Model2, CapsuleModel2, CapsuleModel3, CapsuleModel4
+from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
 from PIL import Image
 
 def mkdir(dir_name):
@@ -74,7 +75,7 @@ def inference(model, data_loader):
             mkdir(inst_dir_name)
 
             class_probs = y_pred_class[j]  # Shape (N, C)
-            
+
             if len(class_probs) != 0:
                 class_probs = class_probs.cpu()
 
@@ -120,12 +121,18 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 20000
+    iteration = 34000
 
     if config.model == 'CapsuleModel2':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel3':
         model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel4':
+        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModelNew1':
+        model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModelNewLayers':
+        model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
     else:
         model = Model2('Model', 'SimpleSegmentation/')
 
