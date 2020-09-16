@@ -6,11 +6,10 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from deeplabv3 import Model, Model2, Model3, CapsuleModel, CapsuleModel2, CapsuleModel3, CapsuleModel4
 from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
 import os
-from losses import MarginLoss
-from focal import FocalLoss
+from losses import MarginLoss, FocalLoss
+
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.argmax(y_pred, 1)
@@ -50,16 +49,11 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
                 param_group['lr'] = config.learning_rate * (1 - (iteration / config.n_iterations) ** 0.9)
 
         optimizer.zero_grad()
-        loss_list = []
         classification_loss = 0
-        # y_pred_seg, y_pred_center, y_pred_regression = model(image)
-        # y_pred_seg, y_pred_center, y_pred_regression, pred_class_list = model(image, gt_point_list, y_gt_seg) # if using CapsuleModel2
+
         y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_reg_pres)
 
-        # loss = (criterion1(y_pred_seg, y_gt_seg.squeeze(1)) * segmentation_weights).mean() * config.seg_coef  # may need to be segmentation_weights.squeeze(1)
-
         loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef
-        loss_list.append((criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef)
 
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
@@ -67,12 +61,10 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
               gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
-              loss_list.append(criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef)        
     
         if config.use_instance:
             loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
             loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_reg_pres).mean() * config.regression_coef
-            loss_list.append(((criterion3(y_pred_regression, y_gt_regression)) * y_gt_reg_pres).mean() * config.regression_coef)
 
         acc = get_accuracy(y_pred_seg, y_gt_seg)
 
@@ -85,8 +77,6 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         if (i + 1) % 10 == 0:
             print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i + 1, float(np.mean(losses)), float(np.mean(accs))), flush=True)
-            # print('loss_list:', loss_list)
-            # print(classification_loss)
 
         if iteration % config.save_every_n_iters == 0:
             print('Model Saving.')
@@ -116,12 +106,6 @@ def run_experiment():
     elif config.model == 'CapsuleModelNewLayers':
         model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel4':
-        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
-        criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    else:
-        model = Model3('Model3', 'SimpleSegmentation/')
-        criterion1 = nn.CrossEntropyLoss(reduction='none', ignore_index=255)
 
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
@@ -151,5 +135,3 @@ def run_experiment():
 
 if __name__ == '__main__':
     run_experiment()
-    # inference.main()
-    print()
