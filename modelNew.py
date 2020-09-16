@@ -38,7 +38,6 @@ class CapsuleModelNew1(nn.Module):
         self.transformer_routing = TransformerRouting(n_feats_in=256, n_caps_out=self.num_classes, output_dim=16)
 
         self.linear = nn.Linear(16, 1)
-        # self.linear_poses = nn.Linear(256, 34)
 
     def forward(self, x, point_lists=None, gt_seg=None):
         # (x has shape (batch_size, 3, h, w))
@@ -93,19 +92,21 @@ class CapsuleModelNew1(nn.Module):
 
                 inst_capsule_poses = capsule_poses[i, :, y_coords, x_coords]  # (256, p)
                 inst_capsule_poses = torch.transpose((inst_capsule_poses), 0, 1) # (p, 256)
- 
-                # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords.unsqueeze(1).float().cuda(), x_coords.unsqueeze(1).float().cuda()), 1)
 
-                # inst_capsule_poses[:, -1] += x_coords.cuda()
-                # inst_capsule_poses[:, -2] += y_coords.cuda()
+                if config.positional_encoding == True:
+                    inst_points_mean = torch.mean(inst_points.float(), 0, keepdim=True)
+                    inst_points_rel =  inst_points - inst_points_mean   # gets the relative coordinates
+                    y_coords_rel, x_coords_rel = inst_points_rel[0, :], inst_points_rel[1, :]
+                    y_coords_rel, x_coords_rel = y_coords_rel / float(h/16), x_coords_rel / float(w/16)   # Performs normalization between 0 and 1
 
-                inst_points_mean = torch.mean(inst_points.float(), 0, keepdim=True)
-                inst_points_rel =  inst_points - inst_points_mean   # gets the relative coordinates
-                y_coords_rel, x_coords_rel = inst_points_rel[0, :], inst_points_rel[1, :]
-                y_coords_rel, x_coords_rel = y_coords_rel / float(h/16), x_coords_rel / float(w/16)   # Performs normalization between 0 and 1
+                    inst_capsule_poses[:, -1] += x_coords_rel.cuda()
+                    inst_capsule_poses[:, -2] += y_coords_rel.cuda()
 
+                    # inst_capsule_poses = torch.cat((inst_capsule_poses, y_coords_rel.unsqueeze(1).float().cuda(), x_coords_rel.unsqueeze(1).float().cuda()), 1)
 
                 inst_capsule_acts = capsule_acts[i, 0, y_coords, x_coords]    # (p, )
+
+                inst_capsule_poses = inst_capsule_poses*inst_capsule_acts.unsqueeze(-1)
 
                 out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_poses, inst_capsule_acts)  # (34, F_out), (34, )
 
@@ -116,7 +117,6 @@ class CapsuleModelNew1(nn.Module):
                 # get activations from the class capsules
                 class_output = F.softmax(linear_class_capsules, dim=-1)
 
-                # class_outs.append(class_output)
                 class_outs.append(out_capsule_acts)
 
             class_outputs.append(torch.stack(class_outs) if len(class_outs) != 0 else [])
