@@ -6,7 +6,7 @@ import os
 
 from resnet import ResNet18_OS16, ResNet34_OS16, ResNet50_OS16, ResNet101_OS16, ResNet152_OS16, ResNet18_OS8, ResNet34_OS8
 from aspp import ASPP, ASPP_Bottleneck
-from decoder import seg_decoder, inst_decoder, by_regression_inst_decoder, seg_decoder2
+from decoder import fg_decoder, inst_decoder
 from capsules import PrimaryCaps, ConvCaps, CapsulePooling
 from HoughCapsules import HoughRouting1
 from setTransformer import TransformerRouting
@@ -25,7 +25,7 @@ class CapsuleModelNew1(nn.Module):
 
         in_feats = 1280
 
-        self.fg_decoder = seg_decoder2(in_feats=in_feats, num_classes=self.num_classes)
+        self.fg_decoder = fg_decoder(in_feats=in_feats, num_classes=self.num_classes)
         self.instance_decoder = inst_decoder(in_feats=in_feats)
 
         self.hough_routing = HoughRouting1()
@@ -149,7 +149,7 @@ class CapsuleModelNewLayers(nn.Module):
 
        in_feats = 1280
 
-       self.fg_decoder = seg_decoder2(in_feats=in_feats, num_classes=self.num_classes)
+       self.fg_decoder = fg_decoder(in_feats=in_feats, num_classes=self.num_classes)
        self.instance_decoder = inst_decoder(in_feats=in_feats)
 
        self.hough_routing = HoughRouting1()
