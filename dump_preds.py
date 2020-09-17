@@ -5,9 +5,8 @@ from train import get_accuracy
 from torch.autograd.variable import Variable
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from deeplabv3 import Model, CapsuleModel, Model2, Model3, CapsuleModel2, CapsuleModel3, CapsuleModel4
 from PIL import Image
-from modelNew import CapsuleModelNew1
+from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
 def mkdir(dir_name):
     if os.path.isdir(dir_name):
         return
@@ -94,16 +93,11 @@ def main():
 
     iteration = 120000
 
-    if config.model == 'CapsuleModel2':
-        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModelNew1':
+    if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel3':
-        model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel4':
-        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
-    else:
-        model = Model3('Model3', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModelNewLayers':
+        model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
+    
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
