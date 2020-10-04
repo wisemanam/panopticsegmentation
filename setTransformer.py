@@ -1,6 +1,8 @@
+import config
 import torch
 from torch import nn
 from math import sqrt
+
 
 def qkv_attention(queries, keys, values, presence):
     """
@@ -65,8 +67,80 @@ class MultiHeadQKVAttention(nn.Module):
 
 
 class TransformerRouting(nn.Module):
-    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=8, output_dim=128):
+    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=config.vote_dim, n_heads=8, output_dim=128, use_vote_transform=True):
         super(TransformerRouting, self).__init__()
+
+        assert hidden_dim % n_heads == 0
+
+        self.hidden_dim = hidden_dim
+        self.n_heads = n_heads
+        self.split_size = hidden_dim // n_heads
+        self.output_dim = output_dim
+        self.use_vote_transform = use_vote_transform
+
+        self.vote_transform = nn.Linear(n_feats_in, hidden_dim)
+
+        self.inducing_points = nn.Parameter(torch.zeros(n_caps_out, hidden_dim))
+        self.inducing_points.data.normal_(0, 0.5)  # Randomly initializes weights
+
+        self.linear_q = nn.Linear(hidden_dim, hidden_dim)
+        self.linear_k = nn.Linear(hidden_dim, hidden_dim)
+        self.linear_v = nn.Linear(hidden_dim, hidden_dim)
+
+        self.linear_output = nn.Linear(hidden_dim, self.output_dim)
+
+    def forward(self, capsule_poses, capsule_acts):
+        """
+
+        :param capsule_poses: Shape (N_i, F_in)
+        :param capsule_acts: Shape (N_i, )
+        :return: Shape (N_j, F_out), (N_j, )
+        """
+
+        # This would require inputting the votes, and removing this first vote transform
+        if self.use_vote_transform:
+            votes = self.vote_transform(capsule_poses)  # (N_i, F)
+        else:
+            votes = capsule_poses
+
+        q_tr = self.linear_q(self.inducing_points)  # (N_j, F)
+        k_tr = self.linear_k(votes)
+        v_tr = self.linear_v(votes)  # (N_i, F) - these are the votes
+
+        q_splits = torch.split(q_tr, self.split_size, -1)
+        k_splits = torch.split(k_tr, self.split_size, -1)
+        v_splits = torch.split(v_tr, self.split_size, -1)
+
+        heads = []
+        for i in range(self.n_heads):
+            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], None))
+        pred_poses = torch.cat(heads, -1)  # (N_j, F)
+
+        out_poses_res = pred_poses.unsqueeze(1)  # (N_j, 1, F)
+        votes_res = v_tr.unsqueeze(0)  # (1, N_i, F)
+
+        diff = (out_poses_res - votes_res)**2  # (N_j, N_i, F)
+
+        acts_res = capsule_acts.unsqueeze(-1).unsqueeze(0)
+
+        sum_acts = torch.sum(acts_res, 1)
+
+        cost_per_dim = torch.sum(diff*acts_res, 1) / (sum_acts + 1e-8)  # (N_j, F)
+
+        total_cost = torch.sum(cost_per_dim, 1) / (cost_per_dim.shape[-1]**0.5 + 1e-7)  # (N_j, )
+
+        # Ideally, low cost -> high activation
+        lmda = 1
+        output_activation = torch.softmax(0-total_cost*lmda, -1)  # (N_j, )
+
+        output_poses = self.linear_output(pred_poses)  # (N_j, F_out) # TODO test if independent linear layer is better
+
+        return output_poses, output_activation
+
+
+class OldTransformerRouting(nn.Module):
+    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=128, n_heads=8, output_dim=128):
+        super(OldTransformerRouting, self).__init__()
 
         assert hidden_dim % n_heads == 0
 
@@ -88,7 +162,6 @@ class TransformerRouting(nn.Module):
 
     def forward(self, capsule_poses, capsule_acts):
         """
-
         :param capsule_poses: Shape (N_i, F_in)
         :param capsule_acts: Shape (N_i, )
         :return: Shape (N_j, F_out), (N_j, )
@@ -132,3 +205,4 @@ class TransformerRouting(nn.Module):
         output_poses = self.linear_output(pred_poses)  # (N_j, F_out) # TODO test if independent linear layer is better
 
         return output_poses, output_activation
+
