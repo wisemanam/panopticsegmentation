@@ -199,9 +199,9 @@ class CapsuleModel2(nn.Module):
                 self.pos_vote_transform = nn.Linear(self.vote_dim + 2, self.vote_dim)  # Will need to add two to first argument if concatenating positional encoding
         self.noise_scale = 4.0
 
-        # self.transformer_routing = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False)
-        self.transformer_routing1 = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=64, output_dim=16, use_vote_transform=True)
-        self.transformer_routing2 = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False)
+        self.transformer_routing = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False)
+        # self.transformer_routing1 = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=64, output_dim=32, use_vote_transform=False)
+        # self.transformer_routing2 = TransformerRouting(n_feats_in=32, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=True)
 
     def forward(self, x, point_lists=None, gt_seg=None, gt_reg=None):
         # (x has shape (batch_size, 3, h, w))
@@ -288,11 +288,9 @@ class CapsuleModel2(nn.Module):
                 inst_capsule_acts = capsule_acts[i, :, y_coords, x_coords]    # (n_caps, p)
                 inst_capsule_acts = inst_capsule_acts.view(self.n_init_capsules*len(y_coords), )  # (n_caps*p, )
 
-                # out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_votes, inst_capsule_acts)  # (34, F_out), (34, )
-
-                out_capsule_poses, out_capsule_acts = self.transformer_routing1(inst_capsule_votes, inst_capsule_acts)
-                out_capsule_poses = out_capsule_poses.transpose(1, 0)
-                out_capsule_poses, out_capsule_acts = self.transformer_routing2(out_capsule_poses, out_capsule_acts)
+                out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_votes, inst_capsule_acts)  # (34, F_out), (34, )
+                # out_capsule_poses, out_capsule_acts = self.transformer_routing1(inst_capsule_votes, inst_capsule_acts)
+                # out_capsule_poses, out_capsule_acts = self.transformer_routing2(out_capsule_poses, out_capsule_acts)
 
                 class_outs.append(out_capsule_acts)
 
