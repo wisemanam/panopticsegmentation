@@ -6,10 +6,10 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
+from modelNew import CapsuleModelNew1, CapsuleModel2
 import os
-from losses import MarginLoss, FocalLoss
-
+from losses import MarginLoss
+from focal import FocalLoss
 
 def get_accuracy(y_pred, y):
     y_argmax = torch.argmax(y_pred, 1)
@@ -103,8 +103,8 @@ def run_experiment():
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModelNewLayers':
-        model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel2':
+        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
 
     criterion2 = nn.MSELoss(reduction='mean')
