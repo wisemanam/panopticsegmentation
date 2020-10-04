@@ -4,25 +4,25 @@ from torch import cuda
 use_cuda = cuda.is_available()
 
 start_iteration = 0
-n_iterations = 120000
+n_iterations = 90000
 
-save_every_n_iters = 2000
+save_every_n_iters = 1000
 
 batch_size = 12
 
 n_classes = 34
 
-model = 'CapsuleModelNew1'  # 'CapsuleModel'
+model = 'CapsuleModel2'  # 'CapsuleModel'
 
-# model_id = 1 # CapsuleModelNew1 new positional encoding add to final dimensions 
-# model_id = 2 # CapsuleModelNew1 new positional encoding concat
+# model_id = 1 # CapsuleModel2 2 capsule layers
+# model_id = 2 # CapsuleModel2 vote_dim = 128, initial capsules = 16
 
-model_id = 3 # CapsuleModelNew1, multiply acts*poses
+model_id = 3 # CapsuleModel2 vote_dim = 128
 # model_id = 4 # CapsuleModelNew1, baseline batch_size=8
-# model_id = 5 # CapsulesModelNewLayers, multiple layers batch_size=12 
+# model_id = 5 # CapsulesModel2, batch_size=12 
 
-# model_id = 6 # CapsuleModelNew1 concatenate batch_size=12
-# model_id = 7 # CapsuleModelNew1 add the final two dimensions batch_size=12
+# model_id = 6 # CapsuleModel2 concatenate
+# model_id = 7 # CapsuleModel2 add to the final two dimensions
 
 
 save_dir = './SavedModels/Run%d/' % model_id
@@ -33,6 +33,8 @@ weight_decay = 0.0
 poly_lr_scheduler = True
 use_dropout = True
 positional_encoding = False
+positional_encoding_type = 'concat'
+vote_dim = 128
 
 data_dir = './CityscapesData'
 
