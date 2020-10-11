@@ -16,31 +16,35 @@ class PrimaryCaps(nn.Module):
         A: output of the normal conv layer
         B: number of types of capsules
         K: kernel size of convolution
-        P: size of pose matrix is P*P
         stride: stride of convolution
+        dim: size of pose vector
 
     Shape:
         input:  (*, A, h, w)
-        output: (*, h', w', B*(P*P+1))
+        output: poses and activations - (*, B*dim, h', w'), (*, B, h', w')
         h', w' is computed the same way as convolution layer
-        parameter size is: K*K*A*B*P*P + B*P*P
+        parameter size is: K*K*A*B*dim + B*dim
     """
-    # def __init__(self, A=32, B=64, K=9, P=4, stride=1):
-    def __init__(self, A, B, K=(3, 3), P=4, stride=(1, 1)):
+    def __init__(self, A, B, K=(3, 3), stride=(1, 1), dim=16):
         super(PrimaryCaps, self).__init__()
-        self.pose = nn.Conv2d(in_channels=A, out_channels=B*P*P, kernel_size=K, stride=stride, bias=True)
+        self.pose = nn.Conv2d(in_channels=A, out_channels=B*dim, kernel_size=K, stride=stride, bias=True)
         self.pose.weight.data.normal_(0.0, 0.1)
         self.a = nn.Conv2d(in_channels=A, out_channels=B, kernel_size=K, stride=stride, bias=True)
         self.a.weight.data.normal_(0.0, 0.1)
         self.sigmoid = nn.Sigmoid()
 
+        self.noise_scale = 4.0
+
     def forward(self, x):
         p = self.pose(x)
         a = self.a(x)
+
+        if self.training:
+            a += ((torch.rand(*a.shape) - 0.5) * self.noise_scale).cuda()
+
         a = self.sigmoid(a)
-        out = torch.cat([p, a], dim=1)
-        out = out.permute(0, 2, 3, 1)
-        return out  # Shape (*, h', w', B*(P*P+1))
+
+        return p, a  # Shape (*, B*dim, h', w'), (*, B, h', w')
 
 
 class CapsulePooling(nn.Module):
