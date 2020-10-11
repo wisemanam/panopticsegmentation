@@ -6,7 +6,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from modelNew import CapsuleModelNew1, CapsuleModel2
+from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel3, CapsuleModel4
 import os
 from losses import MarginLoss
 from focal import FocalLoss
@@ -105,6 +105,12 @@ def run_experiment():
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     elif config.model == 'CapsuleModel2':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
+        criterion1 = FocalLoss(alpha=0.25, gamma=2)
+    elif config.model == 'CapsuleModel3':
+        model = CapsuleModel3('CapsuleModel3', 'SimpleSegmentation/')
+        criterion1 = FocalLoss(alpha=0.25, gamma=2)
+    elif config.model == 'CapsuleModel4':
+        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
 
     criterion2 = nn.MSELoss(reduction='mean')
