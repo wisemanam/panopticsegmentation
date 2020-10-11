@@ -12,18 +12,17 @@ batch_size = 12
 
 n_classes = 34
 
-model = 'CapsuleModel2'  # 'CapsuleModel'
+model = 'CapsuleModel4'  # 'CapsuleModel'
 
-# model_id = 1 # CapsuleModel2 2 capsule layers
+# model_id = 1 # CapsuleModel2 2 capsule layers, vote_dim = 128, lmda = 10000
 # model_id = 2 # CapsuleModel2 vote_dim = 128, initial capsules = 16
-
-model_id = 3 # CapsuleModel2 vote_dim = 128
-# model_id = 4 # CapsuleModelNew1, baseline batch_size=8
-# model_id = 5 # CapsulesModel2, batch_size=12 
-
+# model_id = 3 # CapsuleModel2 vote_dim = 128
+# model_id = 4 # CapsuleModel2 2 capsule layers, with top-down routing
+# model_id = 5 # CapsuleModel2, use_top_down_routing = True, no positional encoding
 # model_id = 6 # CapsuleModel2 concatenate
-# model_id = 7 # CapsuleModel2 add to the final two dimensions
-
+# model_id = 7 # CapsuleModel3, upscale before routing (vote_dim = 128)
+# model_id = 8 # CapsuleModel2, use_top_down_routing = True, concat, vote_dim=128, lmda=1
+model_id = 9 # CapsuelModel4
 
 save_dir = './SavedModels/Run%d/' % model_id
 
@@ -34,7 +33,11 @@ poly_lr_scheduler = True
 use_dropout = True
 positional_encoding = False
 positional_encoding_type = 'concat'
+n_init_capsules = 8
+multiple_capsule_layers = False
 vote_dim = 128
+lmda = 1
+use_top_down_routing = False
 
 data_dir = './CityscapesData'
 
