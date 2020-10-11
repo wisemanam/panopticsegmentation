@@ -4,26 +4,33 @@ from torch import nn
 from math import sqrt
 
 
-def qkv_attention(queries, keys, values, presence):
+def qkv_attention(queries, keys, values, presence, top_down=False):
     """
 
     :param queries: Shape (N_j, F)
     :param keys:  Shape (N_i, F)
     :param values:  Shape (N_i, F)
     :param acts:   Shape (N_i, ), should be binary or close to it
+    :param top_down: Boolean, if True, then softmax is performed over the columns (i.e. information from the lower level
+    capsule is sent to the higher level capsule that it most agrees with), if False, then softmax is performed across
+    the row (i.e. information from lower level capsules is sent based on if it has a high agreement with the higher
+    level capsule's mean)
     :return:
     """
     n_dims = queries.shape[-1]
 
-    qk = torch.matmul(queries, torch.transpose(keys, 1, 0))  # (N_j, N_i)
+    qk = torch.matmul(queries, torch.transpose(keys, -1, -2))  # (N_j, N_i)
 
     if presence is not None:
-        presence = presence.unsqueeze(0)
+        presence = presence.unsqueeze(-2)
         qk -= (1.0-presence)*1e32
 
     qk = torch.softmax(qk/sqrt(n_dims), -1)  # (N_j, N_i)
 
-    return torch.matmul(qk, values)  # (N_j, F)
+    if top_down:
+        return torch.matmul(qk, values) / (torch.sum(qk, -1, keepdim=True) + 1e-10)
+    else:
+        return torch.matmul(qk, values)  # (N_j, F)
 
 
 class MultiHeadQKVAttention(nn.Module):
@@ -67,7 +74,8 @@ class MultiHeadQKVAttention(nn.Module):
 
 
 class TransformerRouting(nn.Module):
-    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=config.vote_dim, n_heads=8, output_dim=128, use_vote_transform=True):
+    def __init__(self, n_feats_in, n_caps_out=34, hidden_dim=config.vote_dim, n_heads=8, output_dim=128,
+                 use_vote_transform=True, top_down_routing=False):
         super(TransformerRouting, self).__init__()
 
         assert hidden_dim % n_heads == 0
@@ -77,6 +85,7 @@ class TransformerRouting(nn.Module):
         self.split_size = hidden_dim // n_heads
         self.output_dim = output_dim
         self.use_vote_transform = use_vote_transform
+        self.top_down_routing = top_down_routing
 
         self.vote_transform = nn.Linear(n_feats_in, hidden_dim)
 
@@ -92,9 +101,9 @@ class TransformerRouting(nn.Module):
     def forward(self, capsule_poses, capsule_acts):
         """
 
-        :param capsule_poses: Shape (N_i, F_in)
-        :param capsule_acts: Shape (N_i, )
-        :return: Shape (N_j, F_out), (N_j, )
+        :param capsule_poses: Shape (..., N_i, F_in)
+        :param capsule_acts: Shape (..., N_i)    ---   or (N_i, ) if no preceding dimensions
+        :return: Shape (..., N_j, F_out), (..., N_j)  ---   or (N_j, F_out), (N_j, ) if no preceding dimensions
         """
 
         # This would require inputting the votes, and removing this first vote transform
@@ -113,21 +122,21 @@ class TransformerRouting(nn.Module):
 
         heads = []
         for i in range(self.n_heads):
-            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], None))
+            heads.append(qkv_attention(q_splits[i], k_splits[i], v_splits[i], None, top_down=self.top_down_routing))
         pred_poses = torch.cat(heads, -1)  # (N_j, F)
 
-        out_poses_res = pred_poses.unsqueeze(1)  # (N_j, 1, F)
-        votes_res = v_tr.unsqueeze(0)  # (1, N_i, F)
+        out_poses_res = pred_poses.unsqueeze(-2)  # (N_j, 1, F)
+        votes_res = v_tr.unsqueeze(-3)  # (1, N_i, F)
 
         diff = (out_poses_res - votes_res)**2  # (N_j, N_i, F)
 
-        acts_res = capsule_acts.unsqueeze(-1).unsqueeze(0)
+        acts_res = capsule_acts.unsqueeze(-1).unsqueeze(-3)
 
-        sum_acts = torch.sum(acts_res, 1)
+        sum_acts = torch.sum(acts_res, -2)
 
-        cost_per_dim = torch.sum(diff*acts_res, 1) / (sum_acts + 1e-8)  # (N_j, F)
+        cost_per_dim = torch.sum(diff*acts_res, -2) / (sum_acts + 1e-8)  # (N_j, F)
 
-        total_cost = torch.sum(cost_per_dim, 1) / (cost_per_dim.shape[-1]**0.5 + 1e-7)  # (N_j, )
+        total_cost = torch.sum(cost_per_dim, -1) / (cost_per_dim.shape[-1]**0.5 + 1e-9)  # (N_j, )
 
         # Ideally, low cost -> high activation
         lmda = 1
@@ -205,4 +214,16 @@ class OldTransformerRouting(nn.Module):
         output_poses = self.linear_output(pred_poses)  # (N_j, F_out) # TODO test if independent linear layer is better
 
         return output_poses, output_activation
+
+if __name__ == '__main__':
+    a = TransformerRouting(64, 34, 128)
+
+    #inp = torch.zeros((17, 64))
+    #inp2 = torch.ones((17, ))
+    inp = torch.zeros((10, 20, 17, 64))
+    inp2 = torch.zeros((10, 20, 17))
+
+    out_p, out_act = a(inp, inp2)
+
+    print(out_p.shape)
 
