@@ -14,18 +14,14 @@ def get_cityscapes_dataset(root='./CityscapesData/', train=True):
 
 def custom_collate(batch):
     image = []
-    segmentation_maps = []
-    instance_centers= []
     instance_regressions = []
     instance_present = []
     segmentation_weights = []
     class_list = []
     point_list = []
     image_name = []
-    for image1, (segmentation_maps1, instance_centers1, instance_regressions1, instance_present1, segmentation_weights1), class_list1, point_list1, image_name1 in batch:
+    for image1, (instance_regressions1, instance_present1, segmentation_weights1), class_list1, point_list1, image_name1 in batch:
        image.append(image1)
-       segmentation_maps.append(torch.tensor(segmentation_maps1))
-       instance_centers.append(torch.tensor(instance_centers1))
        instance_regressions.append(torch.tensor(instance_regressions1))
        instance_present.append(torch.tensor(instance_present1))
        segmentation_weights.append(torch.tensor(segmentation_weights1))
@@ -33,15 +29,11 @@ def custom_collate(batch):
        point_list.append([torch.Tensor(item).long() for item in point_list1]) # point_list1 is a list of 4 tensors (2, N)
        image_name.append(image_name1)
     image = torch.stack(image)
-    segmentation_maps = torch.stack(segmentation_maps)
-    instance_centers = torch.stack(instance_centers)
     instance_regressions = torch.stack(instance_regressions)
     instance_present = torch.stack(instance_present)
     segmentation_weights = torch.stack(segmentation_weights)
-    # image_name = torch.stack(image_name)
-    #print(point_list)
-    #print(image.shape)
-    return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
+    
+    return image, (instance_regressions, instance_present, segmentation_weights), class_list, point_list, image_name
 
 
 
@@ -108,7 +100,6 @@ class CustomCityscapes(Cityscapes):
         instance_maps = instance_maps.resize(size=(w, h), resample=Image.NEAREST)
 
         instance_maps = np.array(instance_maps)
-        center_map = np.zeros((h, w))
         instance_regressions = np.zeros((2, h, w))
         regression_present = np.zeros((h, w))
         segmentation_weights = np.ones((h, w))
@@ -121,18 +112,13 @@ class CustomCityscapes(Cityscapes):
         class_list = []
         for instance in instance_values:
             pixels = np.stack(np.where(instance_maps == instance))
-            # print(pixels.shape)
 
             point_list.append(pixels)
 
             center = np.round(np.mean(pixels, 1)).astype(np.int32)  # gives the center (y, x)
             center = np.array((min(h - 17, max(17, center[0])), min(w - 17, max(17, center[1]))))
-
-            y, x = center[0], center[1]
             
             class_list.append(np.array(segmentation_maps)[pixels[0][0]][pixels[1][0]])
-
-            center_map[y - 16: y + 17, x - 16: x + 17] = np.maximum(self.gaussian, center_map[y - 16: y + 17, x - 16: x + 17])
 
             dists = pixels - np.expand_dims(center, 1)
 
@@ -140,11 +126,10 @@ class CustomCityscapes(Cityscapes):
             regression_present[pixels[0], pixels[1]] = 1
 
             if pixels.shape[1] <= 64 * 64:
-                segmentation_weights[pixels[0], pixels[1]] = 3
+                segmentation_weights[pixels[0], pixels[1]] = 10
 
         instance_regressions = np.concatenate((instance_regressions[1:], instance_regressions[:1]), 0)  # Changes from y-x to x-y
 
-        instance_centers = np.expand_dims(center_map, 0)
         instance_present = np.expand_dims(regression_present, 0)
         segmentation_weights = np.expand_dims(segmentation_weights, 0)
 
@@ -160,4 +145,4 @@ class CustomCityscapes(Cityscapes):
         else:
             assert NotImplementedError, "Must have either 19 or 34 classes for Cityscapes"
 
-        return image, (segmentation_maps, instance_centers, instance_regressions, instance_present, segmentation_weights), class_list, point_list, img_name 
+        return image, (instance_regressions, instance_present, segmentation_weights), class_list, point_list, img_name
