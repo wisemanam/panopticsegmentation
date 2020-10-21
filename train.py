@@ -26,20 +26,16 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
     losses, accs = [], []
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
+        image, (y_gt_regression, y_gt_fgbg_seg, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
         image = Variable(image.type(torch.FloatTensor))
-        y_gt_seg = Variable(y_gt_seg.type(torch.LongTensor))
-        y_gt_center = Variable(y_gt_center.type(torch.FloatTensor))
         y_gt_regression = Variable(y_gt_regression.type(torch.FloatTensor))
-        y_gt_reg_pres = Variable(y_gt_reg_pres.type(torch.FloatTensor))
+        y_gt_fgbg_seg = Variable(y_gt_fgbg_seg.type(torch.FloatTensor))
         segmentation_weights = Variable(segmentation_weights.type(torch.FloatTensor))
 
         if config.use_cuda:
             image = image.cuda()
-            y_gt_seg = y_gt_seg.cuda()
-            y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
-            y_gt_reg_pres = y_gt_reg_pres.cuda()
+            y_gt_fgbg_seg = y_gt_fgbg_seg.cuda()
             segmentation_weights = segmentation_weights.cuda()
             gt_class_list = [i.cuda() if len(i) != 0 else [] for i in gt_class_list]
 
@@ -51,9 +47,9 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         optimizer.zero_grad()
         classification_loss = 0
 
-        y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_reg_pres)
+        y_pred_fgbg_seg, y_pred_center, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_fgbg_seg)
 
-        loss = (criterion4(y_pred_seg, y_gt_reg_pres) * segmentation_weights).mean() * config.seg_coef
+        loss = (criterion4(y_pred_fgbg_seg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
 
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         for j in range(len(gt_class_list)):
@@ -63,17 +59,16 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
               classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
     
         if config.use_instance:
-            loss += criterion2(y_pred_center, y_gt_center) * config.center_coef
-            loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_reg_pres).mean() * config.regression_coef
+            loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_fgbg_seg).mean() * config.regression_coef
 
-        acc = get_accuracy(y_pred_seg, y_gt_seg)
+        acc = get_accuracy(y_pred_fgbg_seg, y_gt_fgbg_seg) # y_gt_seg)
 
         loss.backward()
         optimizer.step()
         losses.append(loss.item())
         accs.append(acc.item())
 
-        del image, y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, loss, acc, y_pred_seg, y_pred_center, y_pred_regression
+        del image, y_gt_regression, y_gt_fgbg_seg, loss, acc, y_pred_fgbg_seg, y_pred_center, y_pred_regression, segmentation_weights, gt_class_list, gt_point_list
 
         if (i + 1) % 10 == 0:
             print('Finished training %d batches. Loss: %.4f. Accuracy: %.4f.' % (i + 1, float(np.mean(losses)), float(np.mean(accs))), flush=True)
@@ -113,6 +108,8 @@ def run_experiment():
         model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
 
+    # model = nn.DataParallel(model)
+
     criterion2 = nn.MSELoss(reduction='mean')
     criterion3 = nn.L1Loss(reduction='none')
     criterion4 = nn.BCELoss(reduction='none')
@@ -128,7 +125,11 @@ def run_experiment():
             exit()
 
         print('Loaded from: ', save_file_path)
-        model.load_state_dict(torch.load(save_file_path)['state_dict'])
+        saved_weights = torch.load(save_file_path)['state_dict']
+        model.load_state_dict(saved_weights)
+        saved_weights.clear()
+        # optimizer.load_state_dict(torch.load(save_file_path)['optimizer'])
+        # optimizer.cpu()
 
     iteration = config.start_iteration
     while iteration < config.n_iterations:
