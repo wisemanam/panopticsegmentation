@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from modelNew import CapsuleModelNew1, CapsuleModel2
+from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel4, CapsuleModel5
 from PIL import Image
 
 def mkdir(dir_name):
@@ -46,23 +46,33 @@ def inference(model, data_loader):
         convert_to_eval.cuda()
 
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
+        image, (y_gt_regression, y_gt_reg_pres, segmentation_weights), gt_class_list, gt_point_list, img_name = sample
 
         if config.use_cuda:
             image = image.cuda()
-            y_gt_seg = y_gt_seg.cuda()
-            y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
             y_gt_reg_pres = y_gt_reg_pres.cuda()
 
         with torch.no_grad():
-            y_pred_fg_seg, y_pred_center, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None)
+            y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None)
+
+            y_pred_fg_seg = y_pred_fg_seg[1]
+            y_pred_regressions = y_pred_regressions[1]
+            y_pred_class = y_pred_class[1]
+            inst_maps = inst_maps[1]
+            segmentation_lists = segmentation_lists[1]
+
 
             # if config.n_classes == 19:  # TODO implement the class conversion later
             #     y_pred_class = convert_to_eval(y_pred_class)
 
 
         for j in range(len(y_pred_fg_seg)):
+            print(len(y_pred_fg_seg), len(y_pred_class), len(segmentation_lists))
+            for j in range(len(y_pred_fg_seg)):
+                print(y_pred_class[j].shape)
+                print(len(segmentation_lists[j]))
+
             img_name_split = img_name[j].split('/')
             city = img_name_split[-2]
 
@@ -112,12 +122,16 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 90000
+    iteration = 30000
 
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel2':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel5':
+        model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel4':
+        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
