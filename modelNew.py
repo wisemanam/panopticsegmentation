@@ -519,6 +519,7 @@ class CapsuleModel5(nn.Module):
     def __init__(self, model_id, project_dir):
         super(CapsuleModel5, self).__init__()
         self.num_classes = config.n_classes
+        self.num_inst_classes = 8
         self.model_id = model_id
         self.project_dir = project_dir
         self.create_model_dirs()
@@ -553,13 +554,13 @@ class CapsuleModel5(nn.Module):
             elif config.positional_encoding_type == 'concat':
                 self.pos_vote_transform = nn.Linear(self.vote_dim + 2, self.vote_dim)  # Will need to add two to first argument if concatenating positional encoding
 
-        self.transformer_routing = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False)
+        self.transformer_routing = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_inst_classes, output_dim=16, use_vote_transform=False)
 
         self.transformer_routing_seg = TransformerRouting(n_feats_in=self.vote_dim_seg, n_caps_out=2, hidden_dim=self.vote_dim_seg, output_dim=16, use_vote_transform=False)
         self.regression_linear = nn.Linear(16, 2)
 
-        self.vote_transform_seg2 = VotingModule(2 + self.num_classes, 16, 16, kernel_dim=3, dilation=3)
-        self.vote_transform_seg3 = VotingModule(2 + self.num_classes, 16, self.vote_dim_seg, kernel_dim=3, dilation=3)
+        self.vote_transform_seg2 = VotingModule(2 + self.num_inst_classes, 16, 16, kernel_dim=3, dilation=3)
+        self.vote_transform_seg3 = VotingModule(2 + self.num_inst_classes, 16, self.vote_dim_seg, kernel_dim=3, dilation=3)
 
         self.transformer_routing_seg2 = TransformerRouting(n_feats_in=self.vote_dim_seg, n_caps_out=2, hidden_dim=self.vote_dim_seg, output_dim=16, use_vote_transform=False)
         self.regression_linear2 = nn.Linear(16, 2)
@@ -572,7 +573,7 @@ class CapsuleModel5(nn.Module):
             elif config.positional_encoding_type == 'concat':
                 self.pos_vote_transform2 = nn.Linear(self.vote_dim + 2, self.vote_dim)  # Will need to add two to first argument if concatenating positional encoding
 
-        self.transformer_routing2 = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False)
+        self.transformer_routing2 = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_inst_classes, output_dim=16, use_vote_transform=False)
 
     def get_primary_and_fg_capsules(self, feature_output, skip_8, skip_4, input_size):
         h, w = input_size
@@ -620,8 +621,8 @@ class CapsuleModel5(nn.Module):
         assert h//h_inp == w/w_inp
         capsule_scale = h//h_inp
 
-        instance_poses = torch.zeros((b_size, h//instance_scale, w//instance_scale, self.num_classes, 16))
-        instance_acts = torch.zeros((b_size, h//instance_scale, w//instance_scale, self.num_classes))
+        instance_poses = torch.zeros((b_size, h//instance_scale, w//instance_scale, self.num_inst_classes, 16))
+        instance_acts = torch.zeros((b_size, h//instance_scale, w//instance_scale, self.num_inst_classes))
 
         class_outputs = []
         for i, point_list in enumerate(point_lists):
@@ -721,7 +722,7 @@ class CapsuleModel5(nn.Module):
 
         return class_outputs
 
-    def forward(self, x, point_lists=None, gt_seg=None, gt_reg=None):
+    def forward(self, x, point_lists=None, gt_seg=None, gt_reg=None, two_stage=True):
         # (x has shape (batch_size, 3, h, w))
         _, _, h, w = x.shape
 
@@ -740,50 +741,52 @@ class CapsuleModel5(nn.Module):
         fg_pred, regressions = get_outputs_from_caps(fgbg_poses, fgbg_acts, self.regression_linear, (h, w))
 
         # Uses hough-routing method to get instance maps from the foreground segmentations and regressions
-        point_lists, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
+        point_lists1, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
 
         capsule_votes_inst = self.vote_transform_class(primary_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
 
         b_size, h_new, w_new, _, _ = fgbg_poses.shape
 
         # performs scatter capsule operation
-        x = self.scatter_capsules(point_lists, capsule_votes_inst, primary_acts, (h, w), instance_scale=4)
+        x = self.scatter_capsules(point_lists1, capsule_votes_inst, primary_acts, (h, w), instance_scale=4)
         instance_poses, instance_acts, class_outputs = x
 
         # appends network outputs
         fg_preds.append(fg_pred)
         reg_preds.append(regressions)
-        class_preds.append(class_outputs)
+        class_preds.append([class8to34(class_output) for class_output in class_outputs])
         inst_maps_preds.append(inst_maps)
         seg_list_preds.append(segmentation_lists)
+        
+        if two_stage:
+            new_capsules_poses = torch.cat((fgbg_poses.cuda(), instance_poses.cuda()), -2)
+            new_capsules_acts = torch.cat((fgbg_acts.cuda(), instance_acts.cuda()), -1)
 
-        new_capsules_poses = torch.cat((fgbg_poses.cuda(), instance_poses.cuda()), -2)
-        new_capsules_acts = torch.cat((fgbg_acts.cuda(), instance_acts.cuda()), -1)
+            new_capsules_poses = new_capsules_poses.view(b_size, h_new, w_new, -1).permute(0, 3, 1, 2)
+            capsule_votes_seg2 = self.vote_transform_seg2(new_capsules_poses)  # (batch_size, n_caps*vote_dim, h/4, w/4)
+            capsule_votes_seg3 = self.vote_transform_seg3(capsule_votes_seg2)
+            capsule_votes_seg3 = capsule_votes_seg3.permute(0, 2, 3, 1).view(b_size, h_new, w_new, self.num_inst_classes+2, self.vote_dim_seg)
+ 
+            fgbg_poses, fgbg_acts = self.transformer_routing_seg(capsule_votes_seg3, new_capsules_acts)  # (B, H_new, W_new, 2, 16), (B, H_new, W_new, 2)
 
-        new_capsules_poses = new_capsules_poses.view(b_size, h_new, w_new, -1).permute(0, 3, 1, 2)
-        capsule_votes_seg2 = self.vote_transform_seg2(new_capsules_poses)  # (batch_size, n_caps*vote_dim, h/4, w/4)
-        capsule_votes_seg3 = self.vote_transform_seg3(capsule_votes_seg2)
-        capsule_votes_seg3 = capsule_votes_seg3.permute(0, 2, 3, 1).view(b_size, h_new, w_new, 34+2, self.vote_dim_seg)
+            fg_pred, regressions = get_outputs_from_caps(fgbg_poses, fgbg_acts, self.regression_linear2, (h, w))
 
-        fgbg_poses, fgbg_acts = self.transformer_routing_seg(capsule_votes_seg3, new_capsules_acts)  # (B, H_new, W_new, 2, 16), (B, H_new, W_new, 2)
+            point_lists, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
 
-        fg_pred, regressions = get_outputs_from_caps(fgbg_poses, fgbg_acts, self.regression_linear2, (h, w))
+            capsule_votes_inst2 = self.vote_transform_class2(primary_poses)
 
-        point_lists, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
-
-        capsule_votes_inst2 = self.vote_transform_class2(primary_poses)
-
-        class_outputs = self.scatter_capsules2(point_lists, capsule_votes_inst2, primary_acts, (h, w))
+            class_outputs = self.scatter_capsules2(point_lists, capsule_votes_inst2, primary_acts, (h, w))
 
         # appends network outputs
         fg_preds.append(fg_pred)
         reg_preds.append(regressions)
-        class_preds.append(class_outputs)
+        class_preds.append([class8to34(class_output) for class_output in class_outputs])
         inst_maps_preds.append(inst_maps)
         seg_list_preds.append(segmentation_lists)
 
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
+        
         return fg_preds, reg_preds, class_preds, inst_maps_preds, seg_list_preds
 
     def create_model_dirs(self):
@@ -795,6 +798,17 @@ class CapsuleModel5(nn.Module):
         if not os.path.exists(self.model_dir):
             os.makedirs(self.model_dir)
             os.makedirs(self.checkpoints_dir)
+
+def class8to34(y):
+    # y should be shape (N, 8)
+    # output should be (N, 34)
+    if len(y) == 0:
+        return y
+    out = torch.zeros_like(y[:, :1]).repeat(1, 34)
+    out[:, -3:] = y[:, -3:]
+    out[:, -10:-5] = y[:, :5]
+    
+    return out
 
 
 if __name__ == '__main__':
