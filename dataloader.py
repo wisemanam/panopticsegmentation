@@ -146,3 +146,4 @@ class CustomCityscapes(Cityscapes):
             assert NotImplementedError, "Must have either 19 or 34 classes for Cityscapes"
 
         return image, (instance_regressions, instance_present, segmentation_weights), class_list, point_list, img_name
+
