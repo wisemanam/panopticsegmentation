@@ -68,11 +68,6 @@ def inference(model, data_loader):
 
 
         for j in range(len(y_pred_fg_seg)):
-            print(len(y_pred_fg_seg), len(y_pred_class), len(segmentation_lists))
-            for j in range(len(y_pred_fg_seg)):
-                print(y_pred_class[j].shape)
-                print(len(segmentation_lists[j]))
-
             img_name_split = img_name[j].split('/')
             city = img_name_split[-2]
 
@@ -122,7 +117,7 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 30000
+    iteration = 27000
 
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
