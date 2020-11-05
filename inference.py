@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel4, CapsuleModel5
+from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel4, CapsuleModel5, CapsuleModel6
 from PIL import Image
 
 def mkdir(dir_name):
@@ -54,13 +54,13 @@ def inference(model, data_loader):
             y_gt_reg_pres = y_gt_reg_pres.cuda()
 
         with torch.no_grad():
-            y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None)
+            y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None, two_stage=True)
 
-            y_pred_fg_seg = y_pred_fg_seg[1]
-            y_pred_regressions = y_pred_regressions[1]
-            y_pred_class = y_pred_class[1]
-            inst_maps = inst_maps[1]
-            segmentation_lists = segmentation_lists[1]
+            y_pred_fg_seg = y_pred_fg_seg[-1]
+            y_pred_regressions = y_pred_regressions[-1]
+            y_pred_class = y_pred_class[-1]
+            inst_maps = inst_maps[-1]
+            segmentation_lists = segmentation_lists[-1]
 
 
             # if config.n_classes == 19:  # TODO implement the class conversion later
@@ -117,16 +117,18 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 27000
+    iteration = 11000
 
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel2':
         model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel5':
-        model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel4':
         model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel5':
+        model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel6':
+        model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
