@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel4, CapsuleModel5, CapsuleModel6
+from modelNew import CapsuleModel5, CapsuleModel6
 from PIL import Image
 
 def mkdir(dir_name):
