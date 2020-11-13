@@ -110,17 +110,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
 
 def run_experiment():
-    if config.model == 'CapsuleModelNew1':
-        model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
-        criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel2':
-        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
-        criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel5':
+    if config.model == 'CapsuleModel5':
         model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
-        criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel4':
-        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     elif config.model == 'CapsuleModel6':
         model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
