@@ -117,15 +117,9 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 11000
+    iteration = 50000
 
-    if config.model == 'CapsuleModelNew1':
-        model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel2':
-        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel4':
-        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel5':
+    if config.model == 'CapsuleModel5':
         model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel6':
         model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
