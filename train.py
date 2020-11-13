@@ -6,7 +6,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from modelNew import CapsuleModelNew1, CapsuleModel2, CapsuleModel4, CapsuleModel5
+from modelNew import CapsuleModel5, CapsuleModel6
 import os
 from losses import MarginLoss
 from focal import FocalLoss
@@ -51,7 +51,9 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
 
         # loss = (criterion4(y_pred_fgbg_seg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
         for pred_fgbg in y_pred_fgbg_seg:
+            # print(pred_fgbg.shape, y_gt_fgbg_seg)
             loss = (criterion4(pred_fgbg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
+            # print('average segmentation map value:', pred_fgbg.mean())
 
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
         # for j in range(len(gt_class_list)):
@@ -59,19 +61,22 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
               # gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
               # loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
               # classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+
         for pred_class in pred_class_list:
             for j in range(len(gt_class_list)):
                 if len(gt_class_list[j]) > 0:
                     gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
                     loss += criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
                     classification_loss = criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
+                    print('classification loss:', classification_loss)
+
 
         if config.use_instance:
             # loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_fgbg_seg).mean() * config.regression_coef
             for pred_reg in y_pred_regression:
                 loss += ((criterion3(pred_reg, y_gt_regression)) * y_gt_fgbg_seg).mean() * config.regression_coef
 
-        acc = get_accuracy(y_pred_fgbg_seg[1], y_gt_fgbg_seg) # y_gt_seg)
+        acc = get_accuracy(y_pred_fgbg_seg[-1], y_gt_fgbg_seg) # y_gt_seg)
 
         loss.backward()
         optimizer.step()
@@ -117,7 +122,9 @@ def run_experiment():
     elif config.model == 'CapsuleModel4':
         model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
-
+    elif config.model == 'CapsuleModel6':
+        model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+        criterion1 = FocalLoss(alpha=0.25, gamma=2)
     # model = nn.DataParallel(model)
 
     criterion2 = nn.MSELoss(reduction='mean')
@@ -138,8 +145,6 @@ def run_experiment():
         saved_weights = torch.load(save_file_path)['state_dict']
         model.load_state_dict(saved_weights)
         saved_weights.clear()
-        # optimizer.load_state_dict(torch.load(save_file_path)['optimizer'])
-        # optimizer.cpu()
 
     iteration = config.start_iteration
     while iteration < config.n_iterations:
