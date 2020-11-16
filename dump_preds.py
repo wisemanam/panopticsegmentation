@@ -6,7 +6,8 @@ from torch.autograd.variable import Variable
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 from PIL import Image
-from modelNew import CapsuleModelNew1, CapsuleModelNewLayers
+from modelNew import CapsuleModel5, CapsuleModel6
+
 def mkdir(dir_name):
     if os.path.isdir(dir_name):
         return
@@ -35,22 +36,27 @@ def inference(model, data_loader):
 
     n_samples = 0
     for i, sample in enumerate(data_loader):
-        image, (y_gt_seg, y_gt_center, y_gt_regression, y_gt_reg_pres, _), gt_class_list, gt_point_list, name = sample
+        image, (y_gt_regression, y_gt_seg, segmentation_weights), gt_class_list, gt_point_list, name = sample
 
         if config.use_cuda:
             image = image.cuda()
             y_gt_seg = y_gt_seg.cuda()
-            y_gt_center = y_gt_center.cuda()
             y_gt_regression = y_gt_regression.cuda()
 
         with torch.no_grad():
-            y_pred_seg, y_pred_center, y_pred_regression, pred_class_list, inst_maps, y_pred_segmentation_lists = model(image, None, None)
+            y_pred_seg, y_pred_regression, pred_class_list, inst_maps, y_pred_segmentation_lists = model(image, None, None, None, two_stage=True)
+            
+            y_pred_seg = y_pred_seg[0]
+            y_pred_regression = y_pred_regression[0]
+            pred_class_list = pred_class_list[0]
+            inst_maps = inst_maps[0]
+            y_pred_segmentation_lists = y_pred_segmentation_lists[0]
 
             y_gt_seg = y_gt_seg.data.cpu().numpy()
-            y_gt_center = y_gt_center.data.cpu().numpy()
+            # y_gt_center = y_gt_center.data.cpu().numpy()
             y_gt_regression = y_gt_regression.data.cpu().numpy()
             y_pred_seg = y_pred_seg.data.cpu().numpy()
-            y_pred_center = y_pred_center.data.cpu().numpy()
+            # y_pred_center = y_pred_center.data.cpu().numpy()
             y_pred_regression = y_pred_regression.data.cpu().numpy()
 
             for j in range(len(y_gt_seg)):
@@ -61,8 +67,8 @@ def inference(model, data_loader):
                 img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
                 np.save(img_name + '_gt_seg.npy', y_gt_seg[j])
 
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_gt_center.npy', y_gt_center[j])
+                # img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                # np.save(img_name + '_gt_center.npy', y_gt_center[j])
 
                 img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
                 np.save(img_name + '_gt_regression.npy', y_gt_regression[j])
@@ -70,8 +76,8 @@ def inference(model, data_loader):
                 img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
                 np.save(img_name + '_pr_seg.npy', y_pred_seg[j])
 
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_pr_center.npy', y_pred_center[j])
+                # img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                # np.save(img_name + '_pr_center.npy', y_pred_center[j])
 
                 img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
                 np.save(img_name + '_pr_regression.npy', y_pred_regression[j])
@@ -91,13 +97,16 @@ def inference(model, data_loader):
 def main():
     mkdir('./DumpedOutputs/')
 
-    iteration = 120000
+    iteration = 66000
 
     if config.model == 'CapsuleModelNew1':
         model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModelNewLayers':
-        model = CapsuleModelNewLayers('CapsuleModelNewLayers', 'SimpleSegmentation/')
-    
+    elif config.model == 'CapsuleModel2':
+        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel6':
+        model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel4':
+        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
