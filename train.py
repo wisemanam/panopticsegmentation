@@ -6,7 +6,7 @@ import numpy as np
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
 import torch.nn as nn
 import torch.optim as optim
-from modelNew import CapsuleModel5, CapsuleModel6
+from modelNew import CapsuleModel5, CapsuleModel6, NewCapsuleModel6, CapsuleModel7
 import os
 from losses import MarginLoss
 from focal import FocalLoss
@@ -47,32 +47,34 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         optimizer.zero_grad()
         classification_loss = 0
 
-        y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=(iteration>20000))
+        y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists, y_dense_class_list = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=False)
 
-        # loss = (criterion4(y_pred_fgbg_seg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
         for pred_fgbg in y_pred_fgbg_seg:
-            # print(pred_fgbg.shape, y_gt_fgbg_seg)
             loss = (criterion4(pred_fgbg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
-            # print('average segmentation map value:', pred_fgbg.mean())
 
         # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
-        # for j in range(len(gt_class_list)):
-          # if len(gt_class_list[j]) > 0:
-              # gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
-              # loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
-              # classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+        # for pred_class in pred_class_list:
+            # for j in range(len(gt_class_list)):
+                # if len(gt_class_list[j]) > 0:
+                    # gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
+                    # loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+                    # classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
 
-        for pred_class in pred_class_list:
+        for i, pred_class in enumerate(pred_class_list):
+            pred_class_dense = y_dense_class_list[i]
             for j in range(len(gt_class_list)):
                 if len(gt_class_list[j]) > 0:
                     gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
                     loss += criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
                     classification_loss = criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
-                    print('classification loss:', classification_loss)
+                    for k in range(len(gt_class_list[j])):
+                        gt_class_onehot_k = gt_class_onehot[k]
+                        pred_class_dense_k = pred_class_dense[j][k]
+                        gt_class_onehot_k = gt_class_onehot_k.unsqueeze(0).repeat(pred_class_dense_k.shape[0], 1)
+                        loss += criterion1(pred_class_dense_k, gt_class_onehot_k.float()).mean() * config.class_coef
 
 
         if config.use_instance:
-            # loss += ((criterion3(y_pred_regression, y_gt_regression)) * y_gt_fgbg_seg).mean() * config.regression_coef
             for pred_reg in y_pred_regression:
                 loss += ((criterion3(pred_reg, y_gt_regression)) * y_gt_fgbg_seg).mean() * config.regression_coef
 
@@ -115,6 +117,12 @@ def run_experiment():
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     elif config.model == 'CapsuleModel6':
         model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+        criterion1 = FocalLoss(alpha=0.25, gamma=2)
+    elif config.model == 'NewCapsuleModel6':
+        model = NewCapsuleModel6('NewCapsuleModel6', 'SimpleSegmentation/')
+        criterion1 = FocalLoss(alpha=0.25, gamma=2)
+    elif config.model == 'CapsuleModel7':
+        model = CapsuleModel7('CapsuleModel7', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     # model = nn.DataParallel(model)
 
