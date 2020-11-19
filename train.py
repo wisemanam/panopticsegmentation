@@ -47,32 +47,34 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         optimizer.zero_grad()
         classification_loss = 0
 
-        y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists, y_dense_class_list = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=False)
+        y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=True)
 
         for pred_fgbg in y_pred_fgbg_seg:
             loss = (criterion4(pred_fgbg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
 
-        # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
-        # for pred_class in pred_class_list:
-            # for j in range(len(gt_class_list)):
-                # if len(gt_class_list[j]) > 0:
-                    # gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
-                    # loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
-                    # classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+        if config.model != 'CapsuleModel7':
+            # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
+            for pred_class in pred_class_list:
+                for j in range(len(gt_class_list)):
+                    if len(gt_class_list[j]) > 0:
+                        gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
+                        loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+                        classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
 
-        for i, pred_class in enumerate(pred_class_list):
-            pred_class_dense = y_dense_class_list[i]
-            for j in range(len(gt_class_list)):
-                if len(gt_class_list[j]) > 0:
-                    gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
-                    loss += criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
-                    classification_loss = criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
-                    for k in range(len(gt_class_list[j])):
-                        gt_class_onehot_k = gt_class_onehot[k]
-                        pred_class_dense_k = pred_class_dense[j][k]
-                        gt_class_onehot_k = gt_class_onehot_k.unsqueeze(0).repeat(pred_class_dense_k.shape[0], 1)
-                        loss += criterion1(pred_class_dense_k, gt_class_onehot_k.float()).mean() * config.class_coef
-
+        else:
+            for m, pred_class in enumerate(pred_class_list):
+                pred_class_dense = y_dense_class_list[m]
+                for j in range(len(gt_class_list)):
+                    if len(gt_class_list[j]) > 0:
+                        gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
+                        loss += criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
+                        classification_loss = criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
+                        for k in range(len(gt_class_list[j])):
+                            gt_class_onehot_k = gt_class_onehot[k]
+                            pred_class_dense_k = pred_class_dense[j][k]
+                            gt_class_onehot_k = gt_class_onehot_k.unsqueeze(0).repeat(pred_class_dense_k.shape[0], 1)
+                            loss += criterion1(pred_class_dense_k, gt_class_onehot_k.float()).mean() * config.class_coef
+      
 
         if config.use_instance:
             for pred_reg in y_pred_regression:
