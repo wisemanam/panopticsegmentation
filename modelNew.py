@@ -934,11 +934,15 @@ class NewCapsuleModel6(nn.Module):
             new_capsules_poses = torch.cat((fgbg_poses.cuda(), instance_poses.cuda()), -2)
             new_capsules_acts = torch.cat((fgbg_acts.cuda(), instance_acts.cuda()), -1)
 
-            # new_capsules_poses = new_capsules_poses.detach()
-            # new_capsules_acts = new_capsules_acts.detach()
+            if config.stop_grad:
+                new_capsules_poses = new_capsules_poses.detach()
+                new_capsules_acts = new_capsules_acts.detach()
 
-            # capsule_poses = primary_poses.detach()
-            # capsule_acts = primary_acts.detach()
+                capsule_poses = primary_poses.detach()
+                capsule_acts = primary_acts.detach()
+            else:
+                capsule_poses = primary_poses
+                capsule_acts = primary_acts
 
             b_size, h_new, w_new, _, _ = fgbg_poses.shape
 
@@ -1244,7 +1248,7 @@ class CapsuleModel7(nn.Module):
         class_votes_dense = self.vote_transform_class_dense(primary_poses)
         b_size, _, h_new, w_new = class_votes_dense.shape
         class_votes_dense = class_votes_dense.permute(0, 2, 3, 1).view(b_size, h_new, w_new, self.n_init_capsules[2], self.vote_dim) # (B, h', w', 32, 32)
-        dense_class_capsules_poses, dense_class_capsules_acts = self.transformer_routing_dense(class_votes_dense, primary_acts)
+        dense_class_capsules_poses, dense_class_capsules_acts = self.transformer_routing_dense(class_votes_dense, primary_acts.permute(0, 2, 3, 1))
         
         class_outputs_dense = []
         for i, point_list in enumerate(point_lists):
@@ -1255,8 +1259,7 @@ class CapsuleModel7(nn.Module):
 
                 y_coords, x_coords = inst_points[0, :], inst_points[1, :]
                 
-                inst_capsule_dense = dense_class_capsules_acts[i, y_coords, x_coords]  # (n_caps*vote_dim, p)
-                print(inst_capsule_dense.shape) # (n , 8)
+                inst_capsule_dense = dense_class_capsules_acts[i, y_coords, x_coords]  # (n, 8)
                 
                 class_outs_dense.append(class8to34(inst_capsule_dense))
                 
