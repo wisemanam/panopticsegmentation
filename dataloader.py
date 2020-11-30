@@ -3,23 +3,26 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
-from pycocotools.coco import COCO
 from torchvision.datasets import VisionDataset
 from torchvision import transforms
 from PIL import Image
 import config
-
+from pycocotools.coco import COCO
 
 def get_coco_dataset(root='./CocoData/', train=True):
-    split = 'train' if train else 'val'
-    return CustomCoco(root, split=split, mode='fine', target_type=['semantic', 'instance'])
+    dataType = ''
+    if train:
+        dataType='train2017'
+    annFile='{}/annotations/instances_{}.json'.format(config.data_dir, dataType)
+    return CustomCoco(root, annFile=annFile)
     
-class CustomCoco(COCO):
-    def __init__(self, root, split=split, mode='fine', target_type=['semantic', 'instance']):
-        super(CustomCoco, self).__init__(root, split=split, mode='fine', target_type=['semantic', 'instance'])
+class CustomCoco(VisionDataset):
+    def __init__(self, root, annFile):
+        super(CustomCoco, self).__init__(root)
         self.to_tensor = transforms.ToTensor()
 
-        self.split = split
+        self.annFile = annFile
+        self.split = annFile.split('/')[-1].split('_')[1].split('.')[0]
 
         self.gaussian = np.zeros((33, 33))
         for i in range(33):
@@ -28,22 +31,25 @@ class CustomCoco(COCO):
 
         self.gaussian = self.gaussian / self.gaussian.max()
 
-        self._TRAIN_ID_TO_EVAL_ID = [7, 8, 11, 12, 13, 17, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 31, 32, 33]
-
-        self._EVAL_ID_TO_TRAIN_ID = [255, 255, 255, 255, 255, 255, 255, 0, 1, 255, 255, 2, 3, 4, 255, 255,
-                                     255, 5, 255, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 255, 255, 16, 17, 18, 255]
-
-        self.conv_eval_to_train = np.vectorize(lambda x: self._EVAL_ID_TO_TRAIN_ID[x])
-        self.conv_train_to_eval = np.vectorize(lambda x: self._TRAIN_ID_TO_EVAL_ID[x])
-
     def __getitem__(self, index):
         img_name = self.images[index]
         h = config.h
         w = config.w
 
-        image, (segmentation_maps, instance_maps) = super().__getitem__(index)
+        image, target = super().__getitem__(index) # target is the object returned by coco.loadAnns
 
-        if self.split == 'train':
+        # get segmentation maps:
+        segmentation_maps = np.zeros((image.size[1], image.size[0]))   # creates empty segmentation map
+        coco=COCO(self.annFile)
+        catIDs = coco.getCatIds()
+        cats = coco.loadCats(catIDs)
+        for i in range(len(target)):
+            className = getClassName(target[i]['category_id'], cats)
+            pixel_value = filterClasses.index(className)+1
+            segmentation_maps = np.maximum(coco.annToMask(target[i])*pixel_value, segmentation_maps)
+
+
+        if self.split == 'train2017':
             if np.random.random_sample([0, 1]) >= 0.5:
                 image = transforms.functional.hflip(image)
                 segmentation_maps = transforms.functional.hflip(segmentation_maps)
