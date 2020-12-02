@@ -3,11 +3,10 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
-from torchvision.datasets import VisionDataset
+from torchvision.datasets.coco import CocoDetection
 from torchvision import transforms
 from PIL import Image
 import config
-from pycocotools.coco import COCO
 
 def get_coco_dataset(root='./CocoData/', train=True):
     dataType = ''
@@ -16,9 +15,9 @@ def get_coco_dataset(root='./CocoData/', train=True):
     annFile='{}/annotations/instances_{}.json'.format(config.data_dir, dataType)
     return CustomCoco(root, annFile=annFile)
     
-class CustomCoco(VisionDataset):
+class CustomCoco(CocoDetection):
     def __init__(self, root, annFile):
-        super(CustomCoco, self).__init__(root)
+        super(CustomCoco, self).__init__(root, annFile)
         self.to_tensor = transforms.ToTensor()
 
         self.annFile = annFile
@@ -37,17 +36,11 @@ class CustomCoco(VisionDataset):
         w = config.w
 
         image, target = super().__getitem__(index) # target is the object returned by coco.loadAnns
-
-        # get segmentation maps:
-        segmentation_maps = np.zeros((image.size[1], image.size[0]))   # creates empty segmentation map
-        coco=COCO(self.annFile)
-        catIDs = coco.getCatIds()
-        cats = coco.loadCats(catIDs)
-        for i in range(len(target)):
-            className = getClassName(target[i]['category_id'], cats)
-            pixel_value = filterClasses.index(className)+1
-            segmentation_maps = np.maximum(coco.annToMask(target[i])*pixel_value, segmentation_maps)
-
+        image_w, image_h = image.size
+        segmentation_maps, instance_maps = cocoSegmentationToSegmentationMap(self.coco, target, (image_h, image_w), checkUniquePixel=False)
+        
+        segmentation_maps = Image.fromarray(segmentation_maps)
+        instance_maps = Image.fromarray(instance_maps)
 
         if self.split == 'train2017':
             if np.random.random_sample([0, 1]) >= 0.5:
