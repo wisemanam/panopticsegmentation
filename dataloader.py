@@ -3,22 +3,67 @@ import numpy as np
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 from torchvision.datasets import Cityscapes
-from torchvision.datasets.coco import CocoDetection
-from torchvision import transforms
+from torchvision.datasets import VisionDataset
+import torchvision
 from PIL import Image
 import config
+import os
+from cocoHelper import cocoSegmentationToSegmentationMap
 
-def get_coco_dataset(root='./CocoData/', train=True):
+def get_coco_dataset(root='./CocoData/images', train=True):
     dataType = ''
     if train:
         dataType='train2017'
+    else:
+        dataType='val2017'
     annFile='{}/annotations/instances_{}.json'.format(config.data_dir, dataType)
-    return CustomCoco(root, annFile=annFile)
+    return CustomCoco(root, annFile=annFile, transform=None, target_transform=None, transforms=None)
+
+class CocoDetection(VisionDataset):
+    def __init__(
+            self,
+            root: str,
+            annFile: str,
+            transform: None,
+            target_transform: None,
+            transforms: None,
+    ) -> None:
+        super(CocoDetection, self).__init__(root, transforms, transform, target_transform)
+        from pycocotoolsLocal.coco import COCO
+        self.coco = COCO(annFile)
+        self.ids = list(sorted(self.coco.imgs.keys()))
+
     
+    def __getitem__(self, index: int):
+        """
+        Args:
+            index (int): Index
+
+        Returns:
+            tuple: Tuple (image, target). target is the object returned by ``coco.loadAnns``.
+        """
+        coco = self.coco
+        img_id = self.ids[index]
+        ann_ids = coco.getAnnIds(imgIds=img_id)
+        target = coco.loadAnns(ann_ids)
+
+        path = coco.loadImgs(img_id)[0]['file_name']
+
+        img = Image.open(os.path.join(self.root, path)).convert('RGB')
+        if self.transforms is not None:
+            img, target = self.transforms(img, target)
+
+        return img, target
+
+
+    def __len__(self):
+        return len(self.ids)
+
 class CustomCoco(CocoDetection):
-    def __init__(self, root, annFile):
-        super(CustomCoco, self).__init__(root, annFile)
-        self.to_tensor = transforms.ToTensor()
+    def __init__(self, root, annFile, transform, target_transform, transforms):
+        super(CustomCoco, self).__init__(root, annFile, transform, target_transform, transforms)
+        self.to_tensor = torchvision.transforms.ToTensor()
+        self.root = root
 
         self.annFile = annFile
         self.split = annFile.split('/')[-1].split('_')[1].split('.')[0]
@@ -31,22 +76,22 @@ class CustomCoco(CocoDetection):
         self.gaussian = self.gaussian / self.gaussian.max()
 
     def __getitem__(self, index):
-        img_name = self.images[index]
+        img_name = self.annFile.split('/')[-1]
         h = config.h
         w = config.w
-
+        
         image, target = super().__getitem__(index) # target is the object returned by coco.loadAnns
         image_w, image_h = image.size
-        segmentation_maps, instance_maps = cocoSegmentationToSegmentationMap(self.coco, target, (image_h, image_w), checkUniquePixel=False)
+        segmentation_maps, instance_maps = cocoSegmentationToSegmentationMap(self.coco, target, (image_h, image_w), checkUniquePixelLabel=False)
         
         segmentation_maps = Image.fromarray(segmentation_maps)
         instance_maps = Image.fromarray(instance_maps)
 
         if self.split == 'train2017':
             if np.random.random_sample([0, 1]) >= 0.5:
-                image = transforms.functional.hflip(image)
-                segmentation_maps = transforms.functional.hflip(segmentation_maps)
-                instance_maps = transforms.functional.hflip(instance_maps)
+                image = torchvision.transforms.functional.hflip(image)
+                segmentation_maps = torchvision.transforms.functional.hflip(segmentation_maps)
+                instance_maps = torchvision.transforms.functional.hflip(instance_maps)
 
             crop_perc = np.random.choice([x / 10 for x in range(5, 15)])
             image_w, image_h = image.size
@@ -58,9 +103,9 @@ class CustomCoco(CocoDetection):
                 top_padding = np.random.randint(0, diff_h)
                 pad_tuple = (left_padding, top_padding, crop_w - left_padding, crop_h - top_padding)
 
-                image = transforms.functional.pad(image, pad_tuple, fill=255)
-                segmentation_maps = transforms.functional.pad(segmentation_maps, pad_tuple, fill=255)
-                instance_maps = transforms.functional.pad(instance_maps, pad_tuple, fill=255)
+                image = torchvision.transforms.functional.pad(image, pad_tuple, fill=255)
+                segmentation_maps = torchvision.transforms.functional.pad(segmentation_maps, pad_tuple, fill=255)
+                instance_maps = torchvision.transforms.functional.pad(instance_maps, pad_tuple, fill=255)
 
                 image_w, image_h = image.size
 
@@ -116,7 +161,7 @@ class CustomCoco(CocoDetection):
         if config.n_classes == 81:
             segmentation_maps = segmentation_maps
         else:
-            assert NotImplementedError, "Must have either 81 classes for COCO"
+            assert NotImplementedError, "Must have 81 classes for COCO"
 
         return image, (instance_regressions, instance_present, segmentation_weights), class_list, point_list, img_name
 
