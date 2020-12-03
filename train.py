@@ -3,10 +3,10 @@ import torch
 import torch.nn.functional as F
 from torch.autograd.variable import Variable
 import numpy as np
-from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
+from dataloader import DataLoader, get_cityscapes_dataset, custom_collate, get_coco_dataset
 import torch.nn as nn
 import torch.optim as optim
-from modelNew import CapsuleModel5, CapsuleModel6, NewCapsuleModel6, CapsuleModel7
+from modelNew import CapsuleModel5, CapsuleModel4, NewCapsuleModel6, CapsuleModel7
 import os
 from losses import MarginLoss
 from focal import FocalLoss
@@ -47,10 +47,13 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
         optimizer.zero_grad()
         classification_loss = 0
 
-        y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=True)
+        if config.model == 'CapsuleModel7':
+            y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists, y_dense_class_list = model(image, gt_point_list, y_gt_fgbg_seg, two_stage=False)
+        else:
+            y_pred_fgbg_seg, y_pred_regression, pred_class_list, y_pred_inst_maps, y_pred_segmentation_lists = model(image, gt_point_list, y_gt_fgbg_seg)
 
-        for pred_fgbg in y_pred_fgbg_seg:
-            loss = (criterion4(pred_fgbg, y_gt_fgbg_seg) * segmentation_weights).mean() * config.seg_coef
+        for i, pred_fgbg in enumerate(y_pred_fgbg_seg):
+            loss = (criterion4(pred_fgbg, y_gt_fgbg_seg[i]) * segmentation_weights).mean() * config.seg_coef
 
         if config.model != 'CapsuleModel7':
             # loops through the ground-truth class_list and the class_outputs and adds the loss for each sample
@@ -58,8 +61,8 @@ def train(model, data_loader, criterion1, criterion2, criterion3, criterion4, op
                 for j in range(len(gt_class_list)):
                     if len(gt_class_list[j]) > 0:
                         gt_class_onehot = F.one_hot(gt_class_list[j], config.n_classes)
-                        loss += criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
-                        classification_loss = criterion1(pred_class_list[j], gt_class_onehot.float()).mean() * config.class_coef
+                        loss += criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
+                        classification_loss = criterion1(pred_class[j], gt_class_onehot.float()).mean() * config.class_coef
 
         else:
             for m, pred_class in enumerate(pred_class_list):
@@ -117,8 +120,8 @@ def run_experiment():
     if config.model == 'CapsuleModel5':
         model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
-    elif config.model == 'CapsuleModel6':
-        model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel4':
+        model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
         criterion1 = FocalLoss(alpha=0.25, gamma=2)
     elif config.model == 'NewCapsuleModel6':
         model = NewCapsuleModel6('NewCapsuleModel6', 'SimpleSegmentation/')
@@ -134,7 +137,7 @@ def run_experiment():
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
 
-    tr_dataset = get_cityscapes_dataset(config.data_dir, True)
+    tr_dataset = get_coco_dataset(config.data_dir + '/images/train2017', True)
 
     if config.start_iteration != 0:
         save_file_path = os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(config.start_iteration))
