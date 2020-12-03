@@ -77,6 +77,171 @@ def get_outputs_from_caps(fgbg_poses, fgbg_acts, regression_layer, input_size):
     regressions[:, 1] = regressions[:, 1] * h
 
     return fg_pred, regressions
+    
+class CapsuleModel4(nn.Module):
+    def __init__(self, model_id, project_dir):
+        super(CapsuleModel4, self).__init__()
+        self.num_classes = config.n_classes
+        self.model_id = model_id
+        self.project_dir = project_dir
+        self.create_model_dirs()
+
+        self.resnet = ResNet50_OS16()  # NOTE! specify the type of ResNet here
+
+        self.aspp = ASPP_Bottleneck()
+
+        in_feats = 1280
+
+        self.hough_routing = HoughRouting1()
+
+        self.n_init_capsules = [4, 4, config.n_init_capsules]
+        self.init_capsule_dim = [4, 8, config.init_capsule_dim]
+
+        self.primary_capsules_skip_4 = PrimaryCaps(256, self.n_init_capsules[0], 1, 1, self.init_capsule_dim[0])
+        self.primary_capsules_skip_8 = PrimaryCaps(512, self.n_init_capsules[1], 1, 1, self.init_capsule_dim[1])
+        self.primary_capsules = PrimaryCaps(in_feats, self.n_init_capsules[2], 1, 1, self.init_capsule_dim[2])
+
+        self.vote_dim_seg = config.vote_dim_seg
+        self.vote_transform_seg_skip_4 = VotingModule(self.n_init_capsules[0], self.init_capsule_dim[0], self.vote_dim_seg)
+        self.vote_transform_seg_skip_8 = VotingModule(self.n_init_capsules[1], self.init_capsule_dim[1], self.vote_dim_seg)
+        self.vote_transform_seg = VotingModule(self.n_init_capsules[2], self.init_capsule_dim[2], self.vote_dim_seg)
+
+        self.vote_dim = config.vote_dim
+        self.vote_transform_class = VotingModule(self.n_init_capsules[2], self.init_capsule_dim[2], self.vote_dim)
+
+        if config.positional_encoding == True:
+            if config.positional_encoding_type == 'addition':
+                self.pos_vote_transform = nn.Linear(self.vote_dim, self.vote_dim)  # Will need to add two to first argument if concatenating positional encoding
+            elif config.positional_encoding_type == 'concat':
+                self.pos_vote_transform = nn.Linear(self.vote_dim + 2, self.vote_dim)  # Will need to add two to first argument if concatenating positional encoding
+
+        self.noise_scale = 4.0
+
+        self.transformer_routing = TransformerRouting(n_feats_in=self.vote_dim, n_caps_out=self.num_classes, output_dim=16, use_vote_transform=False, top_down_routing=config.use_top_down_routing)
+
+        self.transformer_routing_seg = TransformerRouting(n_feats_in=self.vote_dim_seg, n_caps_out=2, hidden_dim=self.vote_dim_seg, output_dim=16, use_vote_transform=False, top_down_routing=config.use_top_down_routing)
+        self.regression_linear = nn.Linear(16, 2)
+
+    def forward(self, x, point_lists=None, gt_seg=None, gt_reg=None):
+        # (x has shape (batch_size, 3, h, w))
+        h = x.size()[2]
+        w = x.size()[3]
+
+        # Encoder:
+        feature_map, skip_8, skip_4 = self.resnet(x)  # (shape: (batch_size, 512, h/16, w/16)) (assuming self.resnet is ResNet18_OS16 or ResNet34_OS16. If self.resnet is ResNe$
+
+        feature_output = self.aspp(feature_map)  # (shape: (batch_size, 1280, h/16, w/16))
+
+        # creates the first capsule layer
+        capsule_poses_s4, capsule_acts_s4 = self.primary_capsules_skip_4(skip_4)
+        capsule_poses_s8, capsule_acts_s8 = self.primary_capsules_skip_8(skip_8)
+
+        capsule_poses, capsule_acts = self.primary_capsules(feature_output)
+
+        capsule_votes_seg_s4 = self.vote_transform_seg_skip_4(capsule_poses_s4)  # (batch_size, n_caps*vote_dim, h/4, w/4)
+        capsule_votes_seg_s8 = self.vote_transform_seg_skip_8(capsule_poses_s8)  # (batch_size, n_caps*vote_dim, h/8, w/8)
+        capsule_votes_seg = self.vote_transform_seg(capsule_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
+
+        capsule_votes_seg_up_s8 = F.upsample(capsule_votes_seg_s8, size=(h//4, w//4), mode="bilinear")
+        capsule_acts_up_s8 = F.upsample(capsule_acts_s8, size=(h//4, w//4), mode="bilinear")
+
+        capsule_votes_seg_up = F.upsample(capsule_votes_seg, size=(h//4, w//4), mode="bilinear")
+        capsule_acts_up = F.upsample(capsule_acts, size=(h//4, w//4), mode="bilinear")
+
+        b_size, _, h_new, w_new = capsule_votes_seg_up.shape
+
+        capsule_votes_seg_s4 = capsule_votes_seg_s4.permute(0, 2, 3, 1).view(b_size, h_new, w_new, self.n_init_capsules[0], self.vote_dim_seg) # (B, h', w', 4, 32)
+        capsule_votes_seg_s8 = capsule_votes_seg_up_s8.permute(0, 2, 3, 1).view(b_size, h_new, w_new, self.n_init_capsules[1], self.vote_dim_seg) # (B, h', w', 8, 32)
+        capsule_votes_seg = capsule_votes_seg_up.permute(0, 2, 3, 1).view(b_size, h_new, w_new, self.n_init_capsules[2], self.vote_dim_seg) # (B, h', w', 32, 32)
+        capsule_votes_seg = torch.cat((capsule_votes_seg, capsule_votes_seg_s8, capsule_votes_seg_s4), -2) # (B, h, w, 16, 32)
+        capsule_acts_seg = torch.cat((capsule_acts_up, capsule_acts_up_s8, capsule_acts_s4), 1).permute(0, 2, 3, 1) # (B, h, w, 16)
+
+        fgbg_poses, fgbg_acts = self.transformer_routing_seg(capsule_votes_seg, capsule_acts_seg)
+
+        fg_pred = fgbg_acts[..., 0].unsqueeze(1)  # Shape (batch_size, 1, h/16, w/16)
+
+        fg_poses = fgbg_poses[..., 0, :]
+        regressions = self.regression_linear(fg_poses).permute(0, 3, 1, 2)
+        regressions = F.tanh(regressions)
+
+        # Resizes the output maps
+        fg_pred = F.upsample(fg_pred, size=(h, w), mode="bilinear")  # (shape: (batch_size, num_classes, h, w))
+        center = torch.zeros_like(fg_pred)  # F.upsample(center, size=(h, w), mode="bilinear")
+        regressions = F.upsample(regressions, size=(h, w), mode="bilinear")
+        regressions[:, 0] = regressions[:, 0] * w
+        regressions[:, 1] = regressions[:, 1] * h
+
+        capsule_votes_class = self.vote_transform_class(capsule_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
+
+        if point_lists is None:
+            # inst_maps, point_lists, segmentation_lists = self.hough_routing(fg_pred, regressions, gt_seg)
+            if gt_reg is None:
+                inst_maps, point_lists, segmentation_lists = self.hough_routing(fg_pred, regressions, gt_seg)
+            else:
+                inst_maps, point_lists, segmentation_lists = self.hough_routing(fg_pred, gt_reg, gt_seg)
+        else:
+            inst_maps = []
+            segmentation_lists = []
+
+        # class_poses, class_acts = torch.zeros(batch_size, h_new, w_new, 8, 16), torch.zeros(batch_size, h_new, w_new, 8, 1)
+
+        class_outputs = []
+        for i, point_list in enumerate(point_lists):
+
+            class_outs = []
+            for inst_points in point_list:
+                # gather capsules corresponding to inst_points
+                inst_points = torch.unique(inst_points // 16, dim=1)
+
+                y_coords, x_coords = inst_points[0, :], inst_points[1, :]
+
+                inst_capsule_votes = capsule_votes_class[i, :, y_coords, x_coords]  # (n_caps*vote_dim, p)
+                inst_capsule_votes = inst_capsule_votes.view(self.n_init_capsules[2], self.vote_dim, len(y_coords))  # (n_caps, vote_dim, p)
+                inst_capsule_votes = torch.transpose(inst_capsule_votes, 1, 2).reshape(self.n_init_capsules[2]*len(y_coords), self.vote_dim)  # (n_caps*p, vote_dim)
+
+                #assert config.positional_encoding == False  # positional encoding will require more changes
+                if config.positional_encoding == True:
+                    inst_points_mean = torch.mean(inst_points.float(), 0, keepdim=True)
+                    inst_points_rel = inst_points - inst_points_mean  # gets the relative coordinates
+                    y_coords_rel, x_coords_rel = inst_points_rel[0, :], inst_points_rel[1, :]
+                    y_coords_rel, x_coords_rel = y_coords_rel / float(h / 16), x_coords_rel / float(w / 16)  # Performs normalization between 0 and 1
+
+                    # x_coords_rel and y_coords_rel should be of shape (p, )
+                    x_coords_rel = x_coords_rel.unsqueeze(0).repeat(self.n_init_capsules[2], 1).reshape(self.n_init_capsules[2]*len(y_coords), )  # makes x_coords_rel of shape (N*P, )
+                    y_coords_rel = y_coords_rel.unsqueeze(0).repeat(self.n_init_capsules[2], 1).reshape(self.n_init_capsules[2]*len(y_coords), )  # makes y_coords_rel of shape (N*P, )
+
+                    if config.positional_encoding_type == 'addition':
+                        inst_capsule_votes[:, -1] += x_coords_rel.cuda()
+                        inst_capsule_votes[:, -2] += y_coords_rel.cuda()
+                    elif config.positional_encoding_type == 'concat':
+                        inst_capsule_votes = torch.cat((inst_capsule_votes, y_coords_rel.unsqueeze(1).float().cuda(), x_coords_rel.unsqueeze(1).float().cuda()), 1)
+
+                    inst_capsule_votes = self.pos_vote_transform(inst_capsule_votes)
+
+                inst_capsule_acts = capsule_acts[i, :, y_coords, x_coords]    # (n_caps, p)
+                inst_capsule_acts = inst_capsule_acts.view(self.n_init_capsules[2]*len(y_coords), )  # (n_caps*p, )
+
+                out_capsule_poses, out_capsule_acts = self.transformer_routing(inst_capsule_votes, inst_capsule_acts)  # (34, F_out), (34, )
+                # out_capsule_poses, out_capsule_acts = self.transformer_routing1(inst_capsule_votes, inst_capsule_acts)
+                # out_capsule_poses, out_capsule_acts = self.transformer_routing2(out_capsule_poses, out_capsule_acts)
+
+                class_outs.append(out_capsule_acts)
+
+            class_outputs.append(torch.stack(class_outs) if len(class_outs) != 0 else [])
+
+        # Should output center with shape (B, 1, H/16, W/16)
+        # and regressions with shape(B, 2, H/16, W/16)
+        return fg_pred, regressions, class_outputs, inst_maps, segmentation_lists
+
+    def create_model_dirs(self):
+        self.logs_dir = self.project_dir + "/training_logs"
+        self.model_dir = self.logs_dir + "/model_%s" % self.model_id
+        self.checkpoints_dir = self.model_dir + "/checkpoints"
+        if not os.path.exists(self.logs_dir):
+            os.makedirs(self.logs_dir)
+        if not os.path.exists(self.model_dir):
+            os.makedirs(self.model_dir)
+            os.makedirs(self.checkpoints_dir)
 
 
 class CapsuleModel5(nn.Module):
@@ -335,11 +500,11 @@ class CapsuleModel5(nn.Module):
 
             fg_pred, regressions = get_outputs_from_caps(fgbg_poses, fgbg_acts, self.regression_linear2, (h, w))
 
-            point_lists, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
+            point_lists2, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
 
             capsule_votes_inst2 = self.vote_transform_class2(primary_poses)
 
-            class_outputs = self.scatter_capsules2(point_lists, capsule_votes_inst2, primary_acts, (h, w))
+            class_outputs = self.scatter_capsules2(point_lists2, capsule_votes_inst2, primary_acts, (h, w))
 
             # appends network outputs
             fg_preds.append(fg_pred)
@@ -915,7 +1080,7 @@ class NewCapsuleModel6(nn.Module):
         #capsule_votes_class = self.vote_transform_class(primary_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
 
         point_lists1, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
-        
+
         class_outputs = []
         
         capsule_votes_inst = self.vote_transform_class(primary_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
@@ -1235,10 +1400,8 @@ class CapsuleModel7(nn.Module):
         regressions[:, 0] = regressions[:, 0] * w
         regressions[:, 1] = regressions[:, 1] * h
 
-        #capsule_votes_class = self.vote_transform_class(primary_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
-
         point_lists1, inst_maps, segmentation_lists = self.create_inst_maps(point_lists, gt_reg, gt_seg, fg_pred, regressions)
-        
+
         class_outputs = []
         
         capsule_votes_inst = self.vote_transform_class(primary_poses)  # (batch_size, n_caps*vote_dim, h/16, w/16)
@@ -1251,7 +1414,7 @@ class CapsuleModel7(nn.Module):
         dense_class_capsules_poses, dense_class_capsules_acts = self.transformer_routing_dense(class_votes_dense, primary_acts.permute(0, 2, 3, 1))
         
         class_outputs_dense = []
-        for i, point_list in enumerate(point_lists):
+        for i, point_list in enumerate(point_lists1):
             class_outs_dense = []
             for inst_points in point_list:
                 # gather capsules corresponding to inst_points
