@@ -231,7 +231,7 @@ class CapsuleModel4(nn.Module):
 
         # Should output center with shape (B, 1, H/16, W/16)
         # and regressions with shape(B, 2, H/16, W/16)
-        return fg_pred, regressions, class_outputs, inst_maps, segmentation_lists
+        return [fg_pred], [regressions], [class_outputs], [inst_maps], [segmentation_lists]
 
     def create_model_dirs(self):
         self.logs_dir = self.project_dir + "/training_logs"
