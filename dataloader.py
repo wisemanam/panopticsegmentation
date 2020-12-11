@@ -76,7 +76,7 @@ class CustomCoco(CocoDetection):
         self.gaussian = self.gaussian / self.gaussian.max()
 
     def __getitem__(self, index):
-        img_name = self.annFile.split('/')[-1]
+        img_name = self.annFile.split('/')[-1].split('.')[0]
         h = config.h
         w = config.w
         
