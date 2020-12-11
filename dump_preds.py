@@ -4,9 +4,9 @@ import torch
 from train import get_accuracy
 from torch.autograd.variable import Variable
 import os
-from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
+from dataloader import DataLoader, get_cityscapes_dataset, custom_collate, get_coco_dataset
 from PIL import Image
-from modelNew import CapsuleModel5, CapsuleModel6
+from modelNew import CapsuleModel5, CapsuleModel6, NewCapsuleModel6, CapsuleModel7, CapsuleModel4
 
 def mkdir(dir_name):
     if os.path.isdir(dir_name):
@@ -44,51 +44,67 @@ def inference(model, data_loader):
             y_gt_regression = y_gt_regression.cuda()
 
         with torch.no_grad():
-            y_pred_seg, y_pred_regression, pred_class_list, inst_maps, y_pred_segmentation_lists = model(image, None, None, None, two_stage=True)
+            if config.model == 'CapsuleModel7':
+                y_pred_seg, y_pred_regression, pred_class_list, inst_maps, y_pred_segmentation_lists, y_dense_class_list = model(image, None, None, None, two_stage=False)
+            else:
+                y_pred_seg, y_pred_regression, pred_class_list, inst_maps, y_pred_segmentation_lists = model(image, None, None, None)
             
-            y_pred_seg = y_pred_seg[0]
-            y_pred_regression = y_pred_regression[0]
-            pred_class_list = pred_class_list[0]
-            inst_maps = inst_maps[0]
-            y_pred_segmentation_lists = y_pred_segmentation_lists[0]
+            y_pred_seg = y_pred_seg[-1]
+            y_pred_regression = y_pred_regression[-1]
+            pred_class_list = pred_class_list[-1]
+            inst_maps = inst_maps[-1]
+            y_pred_segmentation_lists = y_pred_segmentation_lists[-1]
 
             y_gt_seg = y_gt_seg.data.cpu().numpy()
-            # y_gt_center = y_gt_center.data.cpu().numpy()
             y_gt_regression = y_gt_regression.data.cpu().numpy()
             y_pred_seg = y_pred_seg.data.cpu().numpy()
-            # y_pred_center = y_pred_center.data.cpu().numpy()
             y_pred_regression = y_pred_regression.data.cpu().numpy()
 
-            for j in range(len(y_gt_seg)):
-                img_name_split = name[j].split('/')
-                city = img_name_split[-2]
-                mkdir('./DumpedOutputs/' + city)
+            if config.data_dir == './CityscapesData':
+                for j in range(len(y_gt_seg)):
+                    img_name_split = name[j].split('/')
+                    city = img_name_split[-2]
+                    mkdir('./DumpedOutputs/' + city)
 
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_gt_seg.npy', y_gt_seg[j])
-
-                # img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                # np.save(img_name + '_gt_center.npy', y_gt_center[j])
-
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_gt_regression.npy', y_gt_regression[j])
-
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_pr_seg.npy', y_pred_seg[j])
-
-                # img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                # np.save(img_name + '_pr_center.npy', y_pred_center[j])
-
-                img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                np.save(img_name + '_pr_regression.npy', y_pred_regression[j])
-
-                if isinstance(inst_maps[j], list) == False:
                     img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
-                    np.save(img_name + '_pr_inst_maps.npy', inst_maps[j].cpu().numpy())
+                    np.save(img_name + '_gt_seg.npy', y_gt_seg[j])
 
-                n_samples += 1
-                if n_samples == 100:
-                    exit()
+                    img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_gt_regression.npy', y_gt_regression[j])
+
+                    img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_pr_seg.npy', y_pred_seg[j])
+
+                    img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_pr_regression.npy', y_pred_regression[j])
+
+                    if isinstance(inst_maps[j], list) == False:
+                        img_name = './DumpedOutputs/' + city + '/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                        np.save(img_name + '_pr_inst_maps.npy', inst_maps[j].cpu().numpy())
+            elif config.data_dir == './CocoData':
+                for j in range(len(y_gt_seg)):
+                    img_name_split = name
+                    mkdir('./DumpedOutputs/')
+
+                    img_name = './DumpedOutputs/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_gt_seg.npy', y_gt_seg[j])
+
+                    img_name = './DumpedOutputs/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_gt_regression.npy', y_gt_regression[j])
+
+                    img_name = './DumpedOutputs/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_pr_seg.npy', y_pred_seg[j])
+
+                    img_name = './DumpedOutputs/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                    np.save(img_name + '_pr_regression.npy', y_pred_regression[j])
+
+                    if isinstance(inst_maps[j], list) == False:
+                        img_name = './DumpedOutputs/' + img_name_split[-1].replace('_leftImg8bit.png', '')
+                        np.save(img_name + '_pr_inst_maps.npy', inst_maps[j].cpu().numpy())
+
+            n_samples += 1
+            if n_samples == 100:
+                exit()
 
         if (i+1) % 5 == 0:
             print('Finished %d batches' % (i+1), flush=True)
@@ -97,20 +113,20 @@ def inference(model, data_loader):
 def main():
     mkdir('./DumpedOutputs/')
 
-    iteration = 66000
+    iteration = 63000
 
-    if config.model == 'CapsuleModelNew1':
-        model = CapsuleModelNew1('CapsuleModelNew1', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel2':
-        model = CapsuleModel2('CapsuleModel2', 'SimpleSegmentation/')
-    elif config.model == 'CapsuleModel6':
-        model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+    if config.model == 'CapsuleModel5':
+        model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel4':
         model = CapsuleModel4('CapsuleModel4', 'SimpleSegmentation/')
+    elif config.model == 'NewCapsuleModel6':
+        model = NewCapsuleModel6('NewCapsuleModel6', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel7':
+        model = CapsuleModel7('CapsuleModel7', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
-    val_dataset = get_cityscapes_dataset(config.data_dir, False)
+    val_dataset = get_coco_dataset(config.data_dir + '/images/val2017', False)
     val_dataloader = DataLoader(val_dataset, batch_size=config.batch_size, shuffle=False, num_workers=config.num_workers, collate_fn=custom_collate)
 
     inference(model, val_dataloader)
