@@ -4,7 +4,7 @@ import torch
 from torch import nn
 import os
 from dataloader import DataLoader, get_cityscapes_dataset, custom_collate
-from modelNew import CapsuleModel5, CapsuleModel6
+from modelNew import CapsuleModel5, CapsuleModel6, NewCapsuleModel6, CapsuleModel7
 from PIL import Image
 
 def mkdir(dir_name):
@@ -54,7 +54,10 @@ def inference(model, data_loader):
             y_gt_reg_pres = y_gt_reg_pres.cuda()
 
         with torch.no_grad():
-            y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None, two_stage=True)
+            if config.model == 'CapsuleModel7':
+                y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists, y_dense_class_list = model(image, None, None, None, two_stage=False)
+            else:
+                y_pred_fg_seg, y_pred_regressions, y_pred_class, inst_maps, segmentation_lists = model(image, None, None, None, two_stage=True)
 
             y_pred_fg_seg = y_pred_fg_seg[-1]
             y_pred_regressions = y_pred_regressions[-1]
@@ -69,11 +72,12 @@ def inference(model, data_loader):
 
         for j in range(len(y_pred_fg_seg)):
             img_name_split = img_name[j].split('/')
-            city = img_name_split[-2]
+            # city = img_name_split[-2]
 
-            mkdir('./SavedImages/val/Instance/' + city)
-            inst_dir_name = './SavedImages/val/Instance/' + city + '/' + img_name_split[-1].replace('leftImg8bit', '')[:-5] + '/'
-            mkdir(inst_dir_name)
+            # mkdir('./SavedImages/val/Instance/' + city)
+            # inst_dir_name = './SavedImages/val/Instance/' + city + '/' + img_name_split[-1].replace('leftImg8bit', '')[:-5] + '/'
+            # mkdir(inst_dir_name)
+            ('./SavedImages/val/Instance/')
 
             class_probs = y_pred_class[j]  # Shape (N, C)
 
@@ -117,12 +121,16 @@ def main():
     mkdir('./SavedImages/val/Pixel/')
     mkdir('./SavedImages/val/Instance/')
 
-    iteration = 50000
+    iteration = 90000
 
     if config.model == 'CapsuleModel5':
         model = CapsuleModel5('CapsuleModel5', 'SimpleSegmentation/')
     elif config.model == 'CapsuleModel6':
         model = CapsuleModel6('CapsuleModel6', 'SimpleSegmentation/')
+    elif config.model == 'NewCapsuleModel6':
+        model = NewCapsuleModel6('NewCapsuleModel6', 'SimpleSegmentation/')
+    elif config.model == 'CapsuleModel7':
+        model = CapsuleModel7('CapsuleModel7', 'SimpleSegmentation/')
 
     model.load_state_dict(torch.load(os.path.join(config.save_dir, 'model_iteration_{}.pth'.format(iteration)))['state_dict'])
 
