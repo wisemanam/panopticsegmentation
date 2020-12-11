@@ -6,7 +6,7 @@ import config
 
 class fg_decoder(nn.Module): # outputs single channel
     def __init__(self, in_feats, num_classes):
-        super(seg_decoder, self).__init__()
+        super(fg_decoder, self).__init__()
 
         self.conv_1x1_1 = nn.Conv2d(in_feats, 256, kernel_size=1)
         self.bn_1x1_1 = nn.BatchNorm2d(256)
