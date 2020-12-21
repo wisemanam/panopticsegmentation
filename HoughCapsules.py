@@ -100,7 +100,7 @@ def get_patches(regressions, kernel_size=3):
 
 
 class HoughRouting1(nn.Module):
-    def __init__(self, nms_kernel_size=7, dims=(512, 1024), top_k=200, circle_radius=5):
+    def __init__(self, nms_kernel_size=7, dims=(640, 640), top_k=200, circle_radius=5):
         super(HoughRouting1, self).__init__()
 
         self.kernel_size = nms_kernel_size
